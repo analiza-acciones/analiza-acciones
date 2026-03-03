@@ -16,7 +16,7 @@ ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7
 
 # ================== Tickers ==================
-sp500_tickers = [
+ibex35_tickers = [
     "ACS.MC","ACX.MC","AENA.MC","AMS.MC","ANA.MC","BBVA.MC","BKT.MC",
     "CABK.MC","CLNX.MC","COL.MC","ENG.MC","ELE.MC","FER.MC","FDR.MC",
     "GRF.MC","IAG.MC","IBE.MC","IDR.MC","ITX.MC","LOG.MC","MAP.MC",
@@ -25,7 +25,7 @@ sp500_tickers = [
 ]
 
 # ================== FUNCIONES ==================
-def analizar_SP500_profesional(ticker_symbol):
+def analizar_ibex35_profesional(ticker_symbol):
     try:
         yf_ticker = ticker_symbol.replace('.', '-')
         t = yf.Ticker(yf_ticker)
@@ -103,8 +103,8 @@ def analizar_SP500_profesional(ticker_symbol):
 @st.cache_data(show_spinner=True)
 def generar_scanner():
     resultados = []
-    for tick in sp500_tickers:
-        res = analizar_SP500_profesional(tick)
+    for tick in ibex35_tickers:
+        res = analizar_ibex35_profesional(tick)
         if res:
             resultados.append(res)
     df = pd.DataFrame(resultados).sort_values(by="Score", ascending=False)
