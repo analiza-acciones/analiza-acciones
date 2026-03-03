@@ -71,6 +71,7 @@ def analizar_SP500_profesional(ticker_symbol):
         t = yf.Ticker(yf_ticker)
         hist = t.history(period="15mo")
         if hist.empty or len(hist) < 200:
+            print(f"⚠️ No hay suficiente historial para {ticker_symbol}")
             return None
 
         nombre_accion = t.info.get('longName', ticker_symbol)
@@ -133,7 +134,8 @@ def analizar_SP500_profesional(ticker_symbol):
             "Stop Loss": round(stop_loss,2),
             "Take Profit": round(take_profit,2)
         }
-    except:
+    except Exception as e:
+        print(f"Error analizando {ticker_symbol}: {e}")
         return None
 
 # ================== Cache nominal ==================
@@ -150,34 +152,31 @@ def generar_scanner(cache_key):
     return df
 
 # ================== Botón refrescar datos ==================
-if st.button("🔄 Actualizar datos del Scanner"):
-    df = generar_scanner("scanner_sp500_v1")
+if 'df' not in st.session_state:
+    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
-    st.success("Datos actualizados correctamente")
 
-# ================== Última actualización ==================
-if 'last_refresh' not in st.session_state:
+if st.button("Actualizar datos"):
+    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
+
+df = st.session_state['df']
+
+# ================== Hora actual y última actualización ==================
+st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%H:%M:%S')}")
 st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
-
-# ================== Cargar datos iniciales ==================
-try:
-    df
-except NameError:
-    df = generar_scanner("scanner_sp500_v1")
-
-if df.empty:
-    st.error("No se pudieron generar datos del scanner.")
-    st.stop()
 
 # ================== Filtros sidebar ==================
 st.sidebar.header("Filtros")
-score_min, score_max = st.sidebar.slider("Score mínimo y máximo", 0, 10, (0,10))
+# Filtro de score con selección múltiple
+score_values = sorted(df["Score"].unique())
+score_seleccionado = st.sidebar.multiselect("Score", score_values, default=score_values)
+
 señales = df["Señal"].unique()
 señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
+
 df_filtrado = df[
-    (df["Score"] >= score_min) &
-    (df["Score"] <= score_max) &
+    (df["Score"].isin(score_seleccionado)) &
     (df["Señal"].isin(señal_filtrada))
 ]
 
@@ -186,11 +185,11 @@ if df_filtrado.empty:
     st.stop()
 
 # ================== Tabs ==================
-tab1, tab2, tab3, tab4 = st.tabs(["📋 Scanner","📈 Gráfico","📅 Earnings","📰 Noticias"])
+tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
 
-# ------------------ TAB 1: Scanner ------------------
+# ------------------ TAB 1: Acciones ------------------
 with tab1:
-    accion_scanner = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="scanner_select")
+    accion_acciones = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="acciones_select")
     st.dataframe(df_filtrado, use_container_width=True)
 
 # ------------------ TAB 2: Gráfico ------------------
@@ -220,9 +219,9 @@ with tab2:
     fig.update_layout(xaxis_rangeslider_visible=False, height=800)
     st.plotly_chart(fig, use_container_width=True)
 
-# ------------------ TAB 3: Earnings ------------------
+# ------------------ TAB 3: Resultados ------------------
 with tab3:
-    accion_earn = st.selectbox("Selecciona acción para Earnings", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="earnings_select")
+    accion_earn = st.selectbox("Selecciona acción para Resultados", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="earnings_select")
     ticker = accion_earn.split(" - ")[0]
 
     url_fut = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now() + timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
@@ -269,3 +268,5 @@ with tab4:
             st.markdown("---")
     else:
         st.info("No hay noticias recientes.")
+
+
