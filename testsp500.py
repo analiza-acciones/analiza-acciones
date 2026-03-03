@@ -7,9 +7,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
 
-# ================== CONFIG ==================
 st.set_page_config(page_title="Dashboard SP500", layout="wide")
 st.title("📊 S&P500")
+
+# ================== CONFIG ==================
 FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
 ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7
@@ -63,22 +64,11 @@ sp500_tickers = [
 "XLNX","XOM","XRAY","XRX","XYL","YUM","ZBH","ZBRA","ZION","ZTS"
 ]
 
-
 # ================== FUNCIONES ==================
 def normalize(value, min_val, max_val):
     if value is None:
         return 0.5
     return max(0, min(1, (value - min_val)/(max_val - min_val)))
-
-def format_number(val):
-    """
-    Convierte un float a string con 2 decimales y miles con punto:
-    1234567.891 -> '1.234.567,89'
-    """
-    try:
-        return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    except:
-        return val
 
 def analizar_SP500_profesional(ticker_symbol):
     try:
@@ -86,6 +76,7 @@ def analizar_SP500_profesional(ticker_symbol):
         t = yf.Ticker(yf_ticker)
         hist = t.history(period="15mo")
         if hist.empty or len(hist) < 200:
+            print(f"⚠️ No hay suficiente historial para {ticker_symbol}")
             return None
 
         nombre_accion = t.info.get('longName', ticker_symbol)
@@ -117,6 +108,7 @@ def analizar_SP500_profesional(ticker_symbol):
         crecimiento_ingresos = t.info.get('revenueGrowth', None)
         beta = t.info.get('beta', None)
 
+        # Normalización y pesos
         score_per = 1 - normalize(per, 5, 50)
         score_roe = normalize(roe, 0, 0.3)
         score_deuda = 1 - normalize(deuda_equity, 0, 2)
@@ -147,46 +139,40 @@ def analizar_SP500_profesional(ticker_symbol):
         return {
             "Ticker": ticker_symbol,
             "Nombre": nombre_accion,
-            "Precio": format_number(c_actual),
+            "Precio": round(c_actual,2),
             "Score": score_final_10,
             "Señal": señal,
-            "RSI": format_number(rsi),
-            "SMA20": format_number(sma20),
-            "SMA50": format_number(sma50),
-            "SMA200": format_number(sma200),
-            "ATR": format_number(atr),
-            "ATR Ratio": format_number(atr_ratio),
-            "Volatilidad Anual": format_number(volatilidad),
-            "Volumen Actual": f"{int(vol_actual):,}".replace(",", "."),
-            "Volumen Medio (Mes)": f"{int(vol_medio_mes):,}".replace(",", "."),
-            "Volumen Relativo": format_number(vol_relativo),
-            "Soporte": format_number(soporte),
-            "Resistencia": format_number(resistencia),
-            "Stop Loss": format_number(stop_loss),
-            "Take Profit": format_number(take_profit)
+            "RSI": round(rsi,2),
+            "SMA20": round(sma20,2),
+            "SMA50": round(sma50,2),
+            "SMA200": round(sma200,2),
+            "ATR": round(atr,2),
+            "ATR Ratio": round(atr_ratio,4),
+            "Volatilidad Anual": round(volatilidad,4),
+            "Volumen Actual": int(vol_actual),
+            "Volumen Medio (Mes)": int(vol_medio_mes),
+            "Volumen Relativo": round(vol_relativo,2),
+            "Soporte": round(soporte,2),
+            "Resistencia": round(resistencia,2),
+            "Stop Loss": round(stop_loss,2),
+            "Take Profit": round(take_profit,2)
         }
-    except:
+    except Exception as e:
+        print(f"Error analizando {ticker_symbol}: {e}")
         return None
 
-# ================== Cache + Barra de progreso ==================
+# ================== Cache + Progress Bar ==================
 @st.cache_data(show_spinner=True, ttl=3600, max_entries=3)
 def generar_scanner(cache_key):
     resultados = []
     total = len(sp500_tickers)
     progress_bar = st.progress(0)
-    pct_text = st.empty()
     
     for i, tick in enumerate(sp500_tickers):
         res = analizar_SP500_profesional(tick)
         if res:
             resultados.append(res)
-        porcentaje = int((i+1)/total*100)
-        progress_bar.progress(porcentaje/100)
-        pct_text.text(f"Procesando acciones: {porcentaje}%")
-    
-    # Quitar barra al finalizar
-    progress_bar.empty()
-    pct_text.empty()
+        progress_bar.progress((i+1)/total)
     
     df = pd.DataFrame(resultados)
     if "Score" in df.columns:
@@ -195,11 +181,12 @@ def generar_scanner(cache_key):
 
 # ================== Cargar datos iniciales ==================
 if 'df' not in st.session_state:
-    st.session_state['df'] = generar_scanner("scanner_sp500_v2")
+    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
 
+# ================== Botón actualizar ==================
 if st.button("Actualizar datos"):
-    st.session_state['df'] = generar_scanner("scanner_sp500_v2")
+    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
 
 df = st.session_state['df']
@@ -208,11 +195,14 @@ df = st.session_state['df']
 st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%H:%M:%S')}")
 st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
 
-# ================== Filtros profesionales ==================
+# ================== Filtros ==================
 st.sidebar.header("Filtros")
-score_min, score_max = st.sidebar.slider("Score (1-10)", 1.0, 10.0, (1.0,10.0), step=0.1)
-señales_seleccionadas = st.sidebar.multiselect("Filtrar por Señal", options=df["Señal"].unique(), default=list(df["Señal"].unique()))
-df_filtrado = df[(df["Score"] >= score_min) & (df["Score"] <= score_max) & (df["Señal"].isin(señales_seleccionadas))]
+score_values = sorted(df["Score"].unique())
+score_seleccionado = st.sidebar.multiselect("Score", score_values, default=score_values)
+señales = df["Señal"].unique()
+señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
+
+df_filtrado = df[(df["Score"].isin(score_seleccionado)) & (df["Señal"].isin(señal_filtrada))]
 
 if df_filtrado.empty:
     st.warning("No hay datos para los filtros seleccionados.")
@@ -223,11 +213,11 @@ accion_global = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - "
 # ================== Semáforo visual ==================
 def color_score(val):
     if val >= 7:
-        color = 'background-color: #2ECC71; color: white'
+        color = 'background-color: #2ECC71; color: white'  # verde
     elif val >= 4:
-        color = 'background-color: #F1C40F; color: black'
+        color = 'background-color: #F1C40F; color: black'  # amarillo
     else:
-        color = 'background-color: #E74C3C; color: white'
+        color = 'background-color: #E74C3C; color: white'  # rojo
     return color
 
 # ================== Tabs ==================
