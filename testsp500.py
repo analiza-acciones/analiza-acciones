@@ -63,7 +63,6 @@ sp500_tickers = [
 "WHR","WLTW","WM","WMB","WMT","WRB","WRK","WY","WYNN","XEL",
 "XLNX","XOM","XRAY","XRX","XYL","YUM","ZBH","ZBRA","ZION","ZTS"
 ]
-
 # ================== FUNCIONES ==================
 def normalize(value, min_val, max_val):
     if value is None:
@@ -151,21 +150,27 @@ def analizar_SP500_profesional(ticker_symbol):
     except:
         return None
 
+# ================== GENERAR SCANNER CON BARRA DE PROGRESO ==================
 @st.cache_data(show_spinner=True, ttl=3600, max_entries=3)
 def generar_scanner(cache_key):
     resultados = []
     total = len(sp500_tickers)
     progress_bar = st.progress(0)
+    progress_text = st.empty()  # texto para porcentaje
     for i, tick in enumerate(sp500_tickers):
         res = analizar_SP500_profesional(tick)
         if res:
             resultados.append(res)
+        porcentaje = int((i+1)/total*100)
         progress_bar.progress((i+1)/total)
+        progress_text.text(f"Procesando acciones... {porcentaje}% completado")
     df = pd.DataFrame(resultados)
     if "Score" in df.columns:
         df = df.sort_values(by="Score", ascending=False)
+    progress_text.text("¡Procesamiento completado!")
     return df
 
+# ================== CARGA DE DATOS ==================
 if 'df' not in st.session_state:
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
@@ -179,7 +184,6 @@ df = st.session_state['df']
 # ================== SIDEBAR ==================
 st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%H:%M:%S')}")
 st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
-
 st.sidebar.header("Filtros")
 
 # Slider para Score
@@ -195,7 +199,7 @@ score_min, score_max = st.sidebar.slider(
 señales = df["Señal"].unique()
 señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
 
-# Filtrado del DataFrame
+# Aplicar filtros
 df_filtrado = df[
     (df["Score"] >= score_min) & 
     (df["Score"] <= score_max) &
@@ -208,15 +212,7 @@ if df_filtrado.empty:
 
 accion_global = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="accion_global")
 
-def color_score(val):
-    if val >= 7:
-        return 'background-color: #2ECC71; color: white'
-    elif val >= 4:
-        return 'background-color: #F1C40F; color: black'
-    else:
-        return 'background-color: #E74C3C; color: white'
-
-# Agregar barra de progreso visual en la tabla
+# ================== ESTILOS DE SCORE ==================
 def score_bar(val):
     color = "#2ECC71" if val >= 7 else "#F1C40F" if val >= 4 else "#E74C3C"
     porcentaje = int(val*10)
@@ -233,29 +229,8 @@ tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultad
 with tab1:
     df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
     st.subheader("📌 Acción seleccionada")
-
-    formato_columnas = {
-        "Precio": "{:.2f}",
-        "RSI": "{:.2f}",
-        "SMA20": "{:.2f}",
-        "SMA50": "{:.2f}",
-        "SMA200": "{:.2f}",
-        "ATR": "{:.2f}",
-        "ATR Ratio": "{:.4f}",
-        "Volatilidad Anual": "{:.4f}",
-        "Volumen Actual": "{:.0f}",
-        "Volumen Medio (Mes)": "{:.0f}",
-        "Volumen Relativo": "{:.2f}",
-        "Soporte": "{:.2f}",
-        "Resistencia": "{:.2f}",
-        "Stop Loss": "{:.2f}",
-        "Take Profit": "{:.2f}"
-    }
-
-    # Tabla con Score como barra
     st.write(df_accion.to_html(escape=False, formatters={"Score": score_bar}), unsafe_allow_html=True)
 
-    # Resto de acciones
     df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
     if not df_restantes.empty:
         st.subheader("📊 Resto de acciones")
