@@ -226,12 +226,44 @@ tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultad
 with tab1:
     df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
     st.subheader("📌 Acción seleccionada")
-    st.dataframe(df_accion.style.applymap(color_score, subset=['Score']), use_container_width=True)
+
+    formato_columnas = {
+        "Precio": "{:.2f}",
+        "Score": "{:.1f}",
+        "RSI": "{:.2f}",
+        "SMA20": "{:.2f}",
+        "SMA50": "{:.2f}",
+        "SMA200": "{:.2f}",
+        "ATR": "{:.2f}",
+        "ATR Ratio": "{:.4f}",
+        "Volatilidad Anual": "{:.4f}",
+        "Volumen Actual": "{:,.0f}",
+        "Volumen Medio (Mes)": "{:,.0f}",
+        "Volumen Relativo": "{:.2f}",
+        "Soporte": "{:.2f}",
+        "Resistencia": "{:.2f}",
+        "Stop Loss": "{:.2f}",
+        "Take Profit": "{:.2f}"
+    }
+
+    st.dataframe(
+        df_accion.style
+        .applymap(color_score, subset=['Score'])
+        .format(formato_columnas),
+        use_container_width=True
+    )
 
     df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
+
     if not df_restantes.empty:
         st.subheader("📊 Resto de acciones filtradas")
-        st.dataframe(df_restantes.style.applymap(color_score, subset=['Score']), use_container_width=True)
+
+        st.dataframe(
+            df_restantes.style
+            .applymap(color_score, subset=['Score'])
+            .format(formato_columnas),
+            use_container_width=True
+        )
 
 with tab2:
     ticker = accion_global.split(" - ")[0]
