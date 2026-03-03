@@ -8,7 +8,9 @@ import requests
 from datetime import datetime, timedelta
 
 # ================= CONFIG APIs =================
-FINNHUB_API_KEY = "d6itlc9r01qleu95hcf0d6itlc9r01qleu95hcfg"
+#FINNHUB_API_KEY = "d6itlc9r01qleu95hcf0d6itlc9r01qleu95hcfg"
+import streamlit as st
+FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
 ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7  # Ventana de días para noticias
 VENTANA_NOTICIAS_DIAS = 7
