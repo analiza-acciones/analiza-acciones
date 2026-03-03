@@ -63,6 +63,7 @@ sp500_tickers = [
 "WHR","WLTW","WM","WMB","WMT","WRB","WRK","WY","WYNN","XEL",
 "XLNX","XOM","XRAY","XRX","XYL","YUM","ZBH","ZBRA","ZION","ZTS"
 ]
+
 # ================== FUNCIONES ==================
 def normalize(value, min_val, max_val):
     if value is None:
@@ -150,13 +151,13 @@ def analizar_SP500_profesional(ticker_symbol):
     except:
         return None
 
-# ================== GENERAR SCANNER CON BARRA DE PROGRESO ==================
+# ================== GENERAR SCANNER ==================
 @st.cache_data(show_spinner=True, ttl=3600, max_entries=3)
 def generar_scanner(cache_key):
     resultados = []
     total = len(sp500_tickers)
     progress_bar = st.progress(0)
-    progress_text = st.empty()  # texto para porcentaje
+    progress_text = st.empty()
     for i, tick in enumerate(sp500_tickers):
         res = analizar_SP500_profesional(tick)
         if res:
@@ -186,7 +187,6 @@ st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%H:%M:%S')}")
 st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
 st.sidebar.header("Filtros")
 
-# Slider para Score
 score_min, score_max = st.sidebar.slider(
     "Score",
     min_value=float(df["Score"].min()),
@@ -195,11 +195,9 @@ score_min, score_max = st.sidebar.slider(
     step=0.1
 )
 
-# Filtrar señales
 señales = df["Señal"].unique()
 señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
 
-# Aplicar filtros
 df_filtrado = df[
     (df["Score"] >= score_min) & 
     (df["Score"] <= score_max) &
@@ -212,31 +210,56 @@ if df_filtrado.empty:
 
 accion_global = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="accion_global")
 
-# ================== ESTILOS DE SCORE ==================
-def score_bar(val):
-    color = "#2ECC71" if val >= 7 else "#F1C40F" if val >= 4 else "#E74C3C"
-    porcentaje = int(val*10)
-    return f"""
-    <div style="background-color:#ddd; width:100%; border-radius:4px;">
-        <div style="width:{porcentaje}%; background-color:{color}; text-align:center; color:white; border-radius:4px;">{val}</div>
-    </div>
-    """
+# ================== FORMATO DE COLUMNAS ==================
+formato_columnas = {
+    "Precio": "{:.2f}",
+    "Score": "{:.1f}",
+    "RSI": "{:.2f}",
+    "SMA20": "{:.2f}",
+    "SMA50": "{:.2f}",
+    "SMA200": "{:.2f}",
+    "ATR": "{:.2f}",
+    "ATR Ratio": "{:.4f}",
+    "Volatilidad Anual": "{:.4f}",
+    "Volumen Actual": "{:.0f}",
+    "Volumen Medio (Mes)": "{:.0f}",
+    "Volumen Relativo": "{:.2f}",
+    "Soporte": "{:.2f}",
+    "Resistencia": "{:.2f}",
+    "Stop Loss": "{:.2f}",
+    "Take Profit": "{:.2f}"
+}
+
+# ================== ESTILO SCORE ==================
+def color_score(val):
+    if val >= 7:
+        return 'background-color: #2ECC71; color: white'
+    elif val >= 4:
+        return 'background-color: #F1C40F; color: black'
+    else:
+        return 'background-color: #E74C3C; color: white'
 
 # ================== TABS ==================
 tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
 
-# ================== TAB 1 - ACCIONES ==================
+# ================== TAB 1 ==================
 with tab1:
     df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
     st.subheader("📌 Acción seleccionada")
-    st.write(df_accion.to_html(escape=False, formatters={"Score": score_bar}), unsafe_allow_html=True)
+    st.dataframe(
+        df_accion.style.applymap(color_score, subset=['Score']).format(formato_columnas),
+        use_container_width=True
+    )
 
     df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
     if not df_restantes.empty:
         st.subheader("📊 Resto de acciones")
-        st.write(df_restantes.to_html(escape=False, formatters={"Score": score_bar}), unsafe_allow_html=True)
+        st.dataframe(
+            df_restantes.style.applymap(color_score, subset=['Score']).format(formato_columnas),
+            use_container_width=True
+        )
 
-# ================== TAB 2 - GRÁFICO ==================
+# ================== TAB 2 ==================
 with tab2:
     ticker = accion_global.split(" - ")[0]
     hist = yf.Ticker(ticker).history(period="1y")
@@ -262,7 +285,7 @@ with tab2:
     fig.update_layout(xaxis_rangeslider_visible=False, height=800)
     st.plotly_chart(fig, use_container_width=True)
 
-# ================== TAB 3 - RESULTADOS ==================
+# ================== TAB 3 ==================
 with tab3:
     ticker = accion_global.split(" - ")[0]
     url_fut = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now() + timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
@@ -290,7 +313,7 @@ with tab3:
     else:
         st.info("No hay resultados anteriores disponibles.")
 
-# ================== TAB 4 - NOTICIAS ==================
+# ================== TAB 4 ==================
 with tab4:
     ticker = accion_global.split(" - ")[0]
     fecha_fin = datetime.now().date()
