@@ -156,25 +156,21 @@ def analizar_SP500_profesional(ticker_symbol):
 def generar_scanner(cache_key):
     resultados = []
     total = len(sp500_tickers)
-
-    progress_text = st.empty()  # Solo texto, sin barra
-
+    progress_bar = st.progress(0)
+    progress_text = st.empty()
     for i, tick in enumerate(sp500_tickers):
         res = analizar_SP500_profesional(tick)
         if res:
             resultados.append(res)
-
-        porcentaje = int((i+1)/total * 100)
-        progress_text.markdown(f"### 🔄 Procesando acciones... {porcentaje}%")
-
+        porcentaje = int((i+1)/total*100)
+        progress_bar.progress((i+1)/total)
+        progress_text.text(f"Procesando acciones... {porcentaje}% completado")
     df = pd.DataFrame(resultados)
-
     if "Score" in df.columns:
         df = df.sort_values(by="Score", ascending=False)
-
-    progress_text.markdown("### ✅ Procesamiento completado")
-
+    progress_text.text("¡Procesamiento completado!")
     return df
+
 # ================== CARGA DE DATOS ==================
 if 'df' not in st.session_state:
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
