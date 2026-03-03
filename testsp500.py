@@ -7,8 +7,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
 
-st.set_page_config(page_title="Dashboard SP500 Mejorado", layout="wide")
-st.title("📊 S&P500 Dashboard Mejorado")
+st.set_page_config(page_title="Dashboard SP500", layout="wide")
+st.title("📊 S&P500")
 
 # ================== CONFIG ==================
 FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
@@ -18,33 +18,28 @@ VENTANA_NOTICIAS_DIAS = 7
 # ================== Lista de tickers ==================
 sp500_tickers = [
     "AAPL","MSFT","GOOGL","AMZN","TSLA","NVDA","META","BRK.B","JNJ","V",
-    # (agrega el resto de tickers aquí o usa tu lista completa)
+    # (agrega el resto de tickers)
 ]
 
 # ================== FUNCIONES ==================
-@st.cache_data(show_spinner=True)
-def descargar_datos(tickers):
-    """Descarga histórica de todos los tickers de una vez."""
+def analizar_SP500_profesional(ticker_symbol):
     try:
-        data = yf.download(tickers, period="15mo", group_by='ticker', threads=True)
-        return data
-    except Exception as e:
-        st.error(f"Error descargando datos: {e}")
-        return None
-
-def analizar_ticker(ticker, df_hist):
-    """Calcula indicadores técnicos y score para un ticker."""
-    try:
-        hist = df_hist[ticker].dropna()
+        yf_ticker = ticker_symbol.replace('.', '-')
+        t = yf.Ticker(yf_ticker)
+        hist = t.history(period="15mo")
         if hist.empty or len(hist) < 200:
             return None
+
+        nombre_accion = t.info.get('longName', ticker_symbol)
+        hist.columns = [col[0] if isinstance(col, tuple) else col for col in hist.columns]
 
         c_actual = hist['Close'].iloc[-1]
         h_5d = hist['High'].tail(5).max()
         l_5d = hist['Low'].tail(5).min()
+
         pivot = (h_5d + l_5d + c_actual) / 3
-        resistencia = (2*pivot - l_5d)
-        soporte = (2*pivot - h_5d)
+        resistencia = (2 * pivot) - l_5d
+        soporte = (2 * pivot) - h_5d
 
         rsi = ta.momentum.RSIIndicator(hist['Close'], window=14).rsi().iloc[-1]
         sma20 = ta.trend.sma_indicator(hist['Close'], window=20).iloc[-1]
@@ -76,7 +71,8 @@ def analizar_ticker(ticker, df_hist):
         take_profit = min(resistencia, c_actual + 2*atr)
 
         return {
-            "Ticker": ticker,
+            "Ticker": ticker_symbol,
+            "Nombre": nombre_accion,
             "Precio": round(c_actual,2),
             "Score": score,
             "Señal": señal,
@@ -99,105 +95,85 @@ def analizar_ticker(ticker, df_hist):
         return None
 
 @st.cache_data(show_spinner=True)
-def generar_scanner(tickers):
-    df_hist = descargar_datos(tickers)
+def generar_scanner():
     resultados = []
-    for tick in tickers:
-        r = analizar_ticker(tick, df_hist)
-        if r:
-            resultados.append(r)
-    df_result = pd.DataFrame(resultados).sort_values(by="Score", ascending=False)
-    return df_result, df_hist
+    for tick in sp500_tickers:
+        res = analizar_SP500_profesional(tick)
+        if res:
+            resultados.append(res)
+    df = pd.DataFrame(resultados).sort_values(by="Score", ascending=False)
+    return df
 
-# ================== Finnhub ==================
-def obtener_earnings_futuros(ticker):
-    try:
-        url = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now()+timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
-        r = requests.get(url).json()
-        return r.get("earningsCalendar",[]) if isinstance(r, dict) else []
-    except:
-        return []
-
-def obtener_earnings_pasados(ticker):
-    try:
-        url = f"https://finnhub.io/api/v1/stock/earnings?symbol={ticker}&token={FINNHUB_API_KEY}"
-        r = requests.get(url).json()
-        return r if isinstance(r,list) else []
-    except:
-        return []
-
-def obtener_noticias(ticker):
-    try:
-        fecha_fin = datetime.now().date()
-        fecha_inicio = fecha_fin - timedelta(days=VENTANA_NOTICIAS_DIAS)
-        url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={fecha_inicio}&to={fecha_fin}&token={FINNHUB_API_KEY}"
-        r = requests.get(url).json()
-        return r if isinstance(r,list) else []
-    except:
-        return []
-
-# ================== Generar scanner ==================
-with st.spinner("Generando scanner..."):
-    df, df_hist = generar_scanner(sp500_tickers)
+# ================== Cargar datos ==================
+try:
+    df
+except NameError:
+    df = generar_scanner()
 
 # ================== Sidebar filtros ==================
-st.sidebar.header("Filtros avanzados")
-score_min, score_max = st.sidebar.slider("Score", 0, 10, (0,10))
-rsi_min, rsi_max = st.sidebar.slider("RSI", 0, 100, (0,100))
-sma200_min = st.sidebar.number_input("Precio > SMA200", 0.0, 10000.0, 0.0)
-vol_min = st.sidebar.number_input("Volumen Relativo Min", 0.0, 5.0, 0.0)
+st.sidebar.header("Filtros")
+score_min, score_max = st.sidebar.slider("Score mínimo y máximo", 0, 10, (0,10))
 señales = df["Señal"].unique()
-señal_filtrada = st.sidebar.multiselect("Señal", señales, default=señales)
+señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
 
 df_filtrado = df[
-    (df["Score"]>=score_min) & (df["Score"]<=score_max) &
-    (df["RSI"]>=rsi_min) & (df["RSI"]<=rsi_max) &
-    (df["SMA200"]<=df["Precio"]) &
-    (df["Volumen Relativo"]>=vol_min) &
+    (df["Score"] >= score_min) &
+    (df["Score"] <= score_max) &
     (df["Señal"].isin(señal_filtrada))
 ]
 
 # ================== Tabs ==================
 tab1, tab2, tab3, tab4 = st.tabs(["📋 Scanner","📈 Gráfico","📅 Earnings","📰 Noticias"])
 
+# ------------------ TAB 1: Scanner ------------------
 with tab1:
-    st.subheader("Scanner S&P500")
-    def color_signal(val):
-        if val=="BUY": return 'background-color: #b6f0b6'
-        elif val=="HOLD": return 'background-color: #fff2b3'
-        else: return 'background-color: #f0b6b6'
-    st.dataframe(df_filtrado.style.applymap(color_signal, subset=["Señal"]), use_container_width=True)
+    st.dataframe(df_filtrado, use_container_width=True)
 
+# ------------------ TAB 2: Gráfico ------------------
 with tab2:
-    accion = st.selectbox("Selecciona acción", df_filtrado["Ticker"])
-    hist = df_hist[accion].dropna()
+    accion_graf = st.selectbox("Selecciona acción para gráfico", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"])
+    ticker = accion_graf.split(" - ")[0]
+    hist = yf.Ticker(ticker).history(period="1y")
     hist["SMA20"] = hist["Close"].rolling(20).mean()
     hist["SMA50"] = hist["Close"].rolling(50).mean()
     hist["SMA200"] = hist["Close"].rolling(200).mean()
-    last_row = df_filtrado[df_filtrado["Ticker"]==accion].iloc[0]
-    soporte = last_row["Soporte"]
-    resistencia = last_row["Resistencia"]
+    fila = df_filtrado[df_filtrado["Ticker"] == ticker].iloc[0]
+    soporte = fila["Soporte"]
+    resistencia = fila["Resistencia"]
 
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7,0.3])
-    fig.add_trace(go.Candlestick(x=hist.index, open=hist["Open"], high=hist["High"],
-                                 low=hist["Low"], close=hist["Close"], name="Precio"), row=1, col=1)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                        vertical_spacing=0.05, row_heights=[0.7, 0.3])
+    fig.add_trace(go.Candlestick(x=hist.index,
+                                 open=hist["Open"], high=hist["High"],
+                                 low=hist["Low"], close=hist["Close"],
+                                 name="Precio"), row=1, col=1)
     fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA20"], name="SMA20"), row=1, col=1)
     fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA50"], name="SMA50"), row=1, col=1)
     fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA200"], name="SMA200"), row=1, col=1)
     fig.add_trace(go.Scatter(x=[hist.index[0], hist.index[-1]], y=[soporte, soporte], name="Soporte", line=dict(dash='dash', color='green')), row=1, col=1)
     fig.add_trace(go.Scatter(x=[hist.index[0], hist.index[-1]], y=[resistencia,resistencia], name="Resistencia", line=dict(dash='dash', color='red')), row=1, col=1)
     fig.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volumen"), row=2, col=1)
-    fig.update_layout(xaxis_rangeslider_visible=False, height=700)
+    fig.update_layout(xaxis_rangeslider_visible=False, height=800)
     st.plotly_chart(fig, use_container_width=True)
 
+# ------------------ TAB 3: Earnings ------------------
 with tab3:
+    accion_earn = st.selectbox("Selecciona acción para Earnings", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="earnings_select")
+    ticker = accion_earn.split(" - ")[0]
+
+    url_fut = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now() + timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
+    future_earnings = requests.get(url_fut).json().get("earningsCalendar", [])
+
+    url_pas = f"https://finnhub.io/api/v1/stock/earnings?symbol={ticker}&token={FINNHUB_API_KEY}"
+    past_earnings = requests.get(url_pas).json()
+
     st.subheader("Próximos resultados")
-    future_earnings = obtener_earnings_futuros(accion)
-    past_earnings = obtener_earnings_pasados(accion)
     if future_earnings:
         for e in future_earnings:
-            st.write(f"{e.get('date')} {e.get('hour','')}")
-            dias_restantes = (pd.to_datetime(e.get("date")).date() - datetime.now().date()).days
+            fecha = e.get("date")
+            hora = e.get("hour","")
+            st.write(f"📌 {fecha} {hora}")
+            dias_restantes = (pd.to_datetime(fecha).date() - datetime.now().date()).days
             if dias_restantes <= ALERTA_DIAS:
                 st.warning(f"🚨 Resultados en {dias_restantes} días")
     else:
@@ -210,9 +186,16 @@ with tab3:
     else:
         st.info("No hay resultados anteriores disponibles.")
 
+# ------------------ TAB 4: Noticias ------------------
 with tab4:
+    accion_news = st.selectbox("Selecciona acción para Noticias", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="news_select")
+    ticker = accion_news.split(" - ")[0]
+    fecha_fin = datetime.now().date()
+    fecha_inicio = fecha_fin - timedelta(days=VENTANA_NOTICIAS_DIAS)
+    url_news = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={fecha_inicio}&to={fecha_fin}&token={FINNHUB_API_KEY}"
+    noticias = requests.get(url_news).json()
+
     st.subheader(f"Noticias últimos {VENTANA_NOTICIAS_DIAS} días")
-    noticias = obtener_noticias(accion)
     if noticias:
         for n in noticias[:10]:
             fecha = datetime.fromtimestamp(n.get("datetime"))
