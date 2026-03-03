@@ -149,13 +149,19 @@ def generar_scanner(cache_key):
         df = df.sort_values(by="Score", ascending=False)
     return df
 
-# ================== Cargar datos ==================
-df = generar_scanner("scanner_sp500_v1")
-if df.empty:
-    st.error("No se pudieron generar datos del scanner. Revisa conexión o tickers.")
-    st.stop()
+# ================== Botón refrescar datos ==================
+if st.button("🔄 Actualizar datos del Scanner"):
+    st.session_state['last_refresh'] = datetime.now()
+    df = generar_scanner("scanner_sp500_v1")
+    st.success("Datos actualizados correctamente")
 
-# ================== Sidebar filtros ==================
+# ================== Última actualización ==================
+if 'last_refresh' not in st.session_state:
+    st.session_state['last_refresh'] = datetime.now()
+
+st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
+
+# ================== Filtros sidebar ==================
 st.sidebar.header("Filtros")
 score_min, score_max = st.sidebar.slider("Score mínimo y máximo", 0, 10, (0,10))
 señales = df["Señal"].unique()
@@ -167,16 +173,21 @@ df_filtrado = df[
     (df["Señal"].isin(señal_filtrada))
 ]
 
+if df_filtrado.empty:
+    st.warning("No hay datos para los filtros seleccionados.")
+    st.stop()
+
 # ================== Tabs ==================
 tab1, tab2, tab3, tab4 = st.tabs(["📋 Scanner","📈 Gráfico","📅 Earnings","📰 Noticias"])
 
 # ------------------ TAB 1: Scanner ------------------
 with tab1:
+    accion_scanner = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="scanner_select")
     st.dataframe(df_filtrado, use_container_width=True)
 
 # ------------------ TAB 2: Gráfico ------------------
 with tab2:
-    accion_graf = st.selectbox("Selecciona acción para gráfico", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"])
+    accion_graf = st.selectbox("Selecciona acción para gráfico", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="grafico_select")
     ticker = accion_graf.split(" - ")[0]
     hist = yf.Ticker(ticker).history(period="1y")
     hist["SMA20"] = hist["Close"].rolling(20).mean()
