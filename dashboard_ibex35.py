@@ -30,7 +30,7 @@ def analizar_ibex35_profesional(ticker_symbol):
         yf_ticker = ticker_symbol.replace('.', '-')
         t = yf.Ticker(yf_ticker)
         hist = t.history(period="15mo")
-        if hist.empty or len(hist) < 200:
+        if hist.empty or len(hist) < 100:
             return None
 
         nombre_accion = t.info.get('longName', ticker_symbol)
@@ -55,7 +55,6 @@ def analizar_ibex35_profesional(ticker_symbol):
         vol_medio_mes = hist['Volume'].tail(21).mean()
         vol_relativo = vol_actual / vol_medio_mes
 
-        # ================== SCORE ==================
         score = 0
         if rsi < 40: score += 2
         elif rsi > 70: score -= 2
@@ -100,22 +99,27 @@ def analizar_ibex35_profesional(ticker_symbol):
         print(f"❌ Error en {ticker_symbol}: {e}")
         return None
 
-# ================== GENERAR CSV EN MEMORIA ==================
+# ================== GENERAR SCANNER ==================
 @st.cache_data(show_spinner=True)
 def generar_scanner_ibex35():
     resultados = []
     for tick in ibex35_tickers:
         res = analizar_ibex35_profesional(tick)
-        if res:
+        if res and "Score" in res:
             resultados.append(res)
+        else:
+            print(f"⚠️ Saltando {tick}, no se pudo calcular Score")
+    if not resultados:
+        st.error("❌ Ningún ticker pudo generar Score")
+        return pd.DataFrame()
     df = pd.DataFrame(resultados).sort_values(by="Score", ascending=False)
     return df
 
 # ================== BOTÓN ACTUALIZAR ==================
-if st.button("🔄 Actualizar datos del Scanner IBEX35"):
-    with st.spinner("Ejecutando scanner IBEX35..."):
+if st.button("🔄 Actualizar datos del Scanner"):
+    with st.spinner("Ejecutando scanner..."):
         df_ibex35 = generar_scanner_ibex35()
-    st.success("Datos IBEX35 actualizados correctamente")
+    st.success("Datos actualizados correctamente")
 
 # ================== CARGAR DATAFRAME ==================
 try:
@@ -127,8 +131,12 @@ except NameError:
         st.error(f"No se pudo generar el scanner: {e}")
         st.stop()
 
+if df_ibex35.empty:
+    st.warning("No se pudieron generar datos del IBEX35")
+    st.stop()
+
 # ================== FILTROS ==================
-st.sidebar.header("Filtros IBEX35")
+st.sidebar.header("Filtros")
 score_min = st.sidebar.slider("Score mínimo", 0, 10, 0)
 score_max = st.sidebar.slider("Score máximo", 0, 10, 10)
 señales = df_ibex35["Señal"].unique()
@@ -142,6 +150,7 @@ df_filtrado = df_ibex35[
 
 st.dataframe(df_filtrado, use_container_width=True)
 if df_filtrado.empty:
+    st.warning("No hay acciones que cumplan los filtros")
     st.stop()
 
 # ================== SELECTOR ==================
