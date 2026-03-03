@@ -239,7 +239,7 @@ with tab1:
     # Resto de acciones filtradas
     df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
     if not df_restantes.empty:
-        st.subheader("📊 Resto de acciones filtradas")
+        st.subheader("📊 Resto de acciones")
         st.dataframe(
             df_restantes.style
             .applymap(color_score, subset=['Score'])
