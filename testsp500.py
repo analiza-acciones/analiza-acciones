@@ -18,7 +18,7 @@ VENTANA_NOTICIAS_DIAS = 7
 # ================== Lista de tickers ==================
 sp500_tickers = [
     "AAPL","MSFT","GOOGL","AMZN","TSLA","NVDA","META","BRK.B","JNJ","V",
-    # (agrega el resto de tickers)
+    # Agrega el resto de tus tickers aquí
 ]
 
 # ================== FUNCIONES ==================
@@ -36,7 +36,6 @@ def analizar_SP500_profesional(ticker_symbol):
         c_actual = hist['Close'].iloc[-1]
         h_5d = hist['High'].tail(5).max()
         l_5d = hist['Low'].tail(5).min()
-
         pivot = (h_5d + l_5d + c_actual) / 3
         resistencia = (2 * pivot) - l_5d
         soporte = (2 * pivot) - h_5d
@@ -94,21 +93,24 @@ def analizar_SP500_profesional(ticker_symbol):
     except:
         return None
 
-@st.cache_data(show_spinner=True)
-def generar_scanner():
+# ================== Cache nominal ==================
+@st.cache_data(show_spinner=True, ttl=3600, max_entries=3)
+def generar_scanner(cache_key):
     resultados = []
     for tick in sp500_tickers:
         res = analizar_SP500_profesional(tick)
         if res:
             resultados.append(res)
-    df = pd.DataFrame(resultados).sort_values(by="Score", ascending=False)
+    df = pd.DataFrame(resultados)
+    if "Score" in df.columns:
+        df = df.sort_values(by="Score", ascending=False)
     return df
 
 # ================== Cargar datos ==================
-try:
-    df
-except NameError:
-    df = generar_scanner()
+df = generar_scanner("scanner_sp500_v1")
+if df.empty:
+    st.error("No se pudieron generar datos del scanner. Revisa conexión o tickers.")
+    st.stop()
 
 # ================== Sidebar filtros ==================
 st.sidebar.header("Filtros")
