@@ -30,39 +30,65 @@ def analizar_ibex35_profesional(ticker_symbol):
         yf_ticker = ticker_symbol.replace('.', '-')
         t = yf.Ticker(yf_ticker)
         hist = t.history(period="15mo")
-        if hist.empty or len(hist) < 100:
-            return None
+        if hist.empty:
+            print(f"❌ Histórico vacío: {ticker_symbol}")
+            return {
+                "Ticker": ticker_symbol,
+                "Nombre": ticker_symbol,
+                "Precio": None,
+                "Score": 0,
+                "Señal": "N/A",
+                "RSI": None,
+                "SMA20": None,
+                "SMA50": None,
+                "SMA200": None,
+                "ATR": None,
+                "ATR Ratio": None,
+                "Volatilidad Anual": None,
+                "Volumen Actual": None,
+                "Volumen Medio (Mes)": None,
+                "Volumen Relativo": None,
+                "Soporte": None,
+                "Resistencia": None,
+                "Stop Loss": None,
+                "Take Profit": None
+            }
 
         nombre_accion = t.info.get('longName', ticker_symbol)
         hist.columns = [col[0] if isinstance(col, tuple) else col for col in hist.columns]
 
         c_actual = hist['Close'].iloc[-1]
-        h_5d = hist['High'].tail(5).max()
-        l_5d = hist['Low'].tail(5).min()
+
+        # Calcular indicadores solo si hay suficientes datos
+        rsi = ta.momentum.RSIIndicator(hist['Close'], window=14).rsi().iloc[-1] if len(hist) >= 14 else None
+        sma20 = ta.trend.sma_indicator(hist['Close'], window=20).iloc[-1] if len(hist) >= 20 else None
+        sma50 = ta.trend.sma_indicator(hist['Close'], window=50).iloc[-1] if len(hist) >= 50 else None
+        sma200 = ta.trend.sma_indicator(hist['Close'], window=200).iloc[-1] if len(hist) >= 200 else None
+        atr = ta.volatility.AverageTrueRange(hist['High'], hist['Low'], hist['Close'], window=14).average_true_range().iloc[-1] if len(hist) >= 14 else None
+        atr_ratio = atr / c_actual if atr else None
+        volatilidad = hist['Close'].pct_change().rolling(252).std().iloc[-1] * (252**0.5) if len(hist) >= 252 else None
+        vol_actual = hist['Volume'].iloc[-1] if 'Volume' in hist else None
+        vol_medio_mes = hist['Volume'].tail(21).mean() if 'Volume' in hist and len(hist) >= 21 else None
+        vol_relativo = vol_actual / vol_medio_mes if vol_actual and vol_medio_mes else None
+
+        h_5d = hist['High'].tail(5).max() if len(hist) >= 5 else c_actual
+        l_5d = hist['Low'].tail(5).min() if len(hist) >= 5 else c_actual
 
         pivot = (h_5d + l_5d + c_actual) / 3
         resistencia = (2 * pivot) - l_5d
         soporte = (2 * pivot) - h_5d
 
-        rsi = ta.momentum.RSIIndicator(hist['Close'], window=14).rsi().iloc[-1]
-        sma20 = ta.trend.sma_indicator(hist['Close'], window=20).iloc[-1]
-        sma50 = ta.trend.sma_indicator(hist['Close'], window=50).iloc[-1]
-        sma200 = ta.trend.sma_indicator(hist['Close'], window=200).iloc[-1]
-        atr = ta.volatility.AverageTrueRange(hist['High'], hist['Low'], hist['Close'], window=14).average_true_range().iloc[-1]
-        atr_ratio = atr / c_actual
-        volatilidad = hist['Close'].pct_change().rolling(252).std().iloc[-1] * (252**0.5)
-        vol_actual = hist['Volume'].iloc[-1]
-        vol_medio_mes = hist['Volume'].tail(21).mean()
-        vol_relativo = vol_actual / vol_medio_mes
-
+        # Calcular Score
         score = 0
-        if rsi < 40: score += 2
-        elif rsi > 70: score -= 2
-        if c_actual > sma20: score += 2
-        if c_actual > sma50: score += 1
-        if c_actual > sma200: score += 1
-        if vol_relativo > 1.2: score += 1
+        if rsi is not None:
+            if rsi < 40: score += 2
+            elif rsi > 70: score -= 2
+        if sma20 is not None and c_actual > sma20: score += 2
+        if sma50 is not None and c_actual > sma50: score += 1
+        if sma200 is not None and c_actual > sma200: score += 1
+        if vol_relativo is not None and vol_relativo > 1.2: score += 1
 
+        # Señal
         if score >= 7:
             señal = "BUY"
         elif score >= 4:
@@ -70,48 +96,64 @@ def analizar_ibex35_profesional(ticker_symbol):
         else:
             señal = "SELL"
 
-        stop_loss = max(soporte, c_actual - 1.5*atr)
-        take_profit = min(resistencia, c_actual + 2*atr)
+        # Stop loss y Take profit
+        stop_loss = max(soporte, c_actual - 1.5*atr) if atr else None
+        take_profit = min(resistencia, c_actual + 2*atr) if atr else None
 
         return {
             "Ticker": ticker_symbol,
             "Nombre": nombre_accion,
-            "Precio": round(c_actual,2),
+            "Precio": round(c_actual,2) if c_actual else None,
             "Score": score,
             "Señal": señal,
-            "RSI": round(rsi,2),
-            "SMA20": round(sma20,2),
-            "SMA50": round(sma50,2),
-            "SMA200": round(sma200,2),
-            "ATR": round(atr,2),
-            "ATR Ratio": round(atr_ratio,4),
-            "Volatilidad Anual": round(volatilidad,4),
-            "Volumen Actual": int(vol_actual),
-            "Volumen Medio (Mes)": int(vol_medio_mes),
-            "Volumen Relativo": round(vol_relativo,2),
-            "Soporte": round(soporte,2),
-            "Resistencia": round(resistencia,2),
-            "Stop Loss": round(stop_loss,2),
-            "Take Profit": round(take_profit,2)
+            "RSI": round(rsi,2) if rsi else None,
+            "SMA20": round(sma20,2) if sma20 else None,
+            "SMA50": round(sma50,2) if sma50 else None,
+            "SMA200": round(sma200,2) if sma200 else None,
+            "ATR": round(atr,2) if atr else None,
+            "ATR Ratio": round(atr_ratio,4) if atr_ratio else None,
+            "Volatilidad Anual": round(volatilidad,4) if volatilidad else None,
+            "Volumen Actual": int(vol_actual) if vol_actual else None,
+            "Volumen Medio (Mes)": int(vol_medio_mes) if vol_medio_mes else None,
+            "Volumen Relativo": round(vol_relativo,2) if vol_relativo else None,
+            "Soporte": round(soporte,2) if soporte else None,
+            "Resistencia": round(resistencia,2) if resistencia else None,
+            "Stop Loss": round(stop_loss,2) if stop_loss else None,
+            "Take Profit": round(take_profit,2) if take_profit else None
         }
 
     except Exception as e:
         print(f"❌ Error en {ticker_symbol}: {e}")
-        return None
+        return {
+            "Ticker": ticker_symbol,
+            "Nombre": ticker_symbol,
+            "Precio": None,
+            "Score": 0,
+            "Señal": "N/A",
+            "RSI": None,
+            "SMA20": None,
+            "SMA50": None,
+            "SMA200": None,
+            "ATR": None,
+            "ATR Ratio": None,
+            "Volatilidad Anual": None,
+            "Volumen Actual": None,
+            "Volumen Medio (Mes)": None,
+            "Volumen Relativo": None,
+            "Soporte": None,
+            "Resistencia": None,
+            "Stop Loss": None,
+            "Take Profit": None
+        }
 
-# ================== GENERAR SCANNER ==================
+# ================== GENERAR CSV EN MEMORIA ==================
 @st.cache_data(show_spinner=True)
 def generar_scanner_ibex35():
     resultados = []
     for tick in ibex35_tickers:
         res = analizar_ibex35_profesional(tick)
-        if res and "Score" in res:
+        if res:
             resultados.append(res)
-        else:
-            print(f"⚠️ Saltando {tick}, no se pudo calcular Score")
-    if not resultados:
-        st.error("❌ Ningún ticker pudo generar Score")
-        return pd.DataFrame()
     df = pd.DataFrame(resultados).sort_values(by="Score", ascending=False)
     return df
 
@@ -128,12 +170,8 @@ except NameError:
     try:
         df_ibex35 = generar_scanner_ibex35()
     except Exception as e:
-        st.error(f"No se pudo generar el scanner: {e}")
+        st.error(f"No se pudieron generar datos del IBEX35: {e}")
         st.stop()
-
-if df_ibex35.empty:
-    st.warning("No se pudieron generar datos del IBEX35")
-    st.stop()
 
 # ================== FILTROS ==================
 st.sidebar.header("Filtros")
@@ -150,7 +188,7 @@ df_filtrado = df_ibex35[
 
 st.dataframe(df_filtrado, use_container_width=True)
 if df_filtrado.empty:
-    st.warning("No hay acciones que cumplan los filtros")
+    st.info("No hay resultados que cumplan los filtros.")
     st.stop()
 
 # ================== SELECTOR ==================
