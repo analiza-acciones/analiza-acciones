@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
-import locale
 
 # ================== CONFIG ==================
 st.set_page_config(page_title="Dashboard SP500", layout="wide")
@@ -14,9 +13,6 @@ st.title("📊 S&P500")
 FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
 ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7
-
-# Configurar formato números
-locale.setlocale(locale.LC_NUMERIC, 'es_ES.UTF-8')  # Para comas como decimales
 
 # ================== Lista de tickers ==================
 sp500_tickers = [
@@ -75,8 +71,12 @@ def normalize(value, min_val, max_val):
     return max(0, min(1, (value - min_val)/(max_val - min_val)))
 
 def format_number(val):
+    """
+    Convierte un float a string con 2 decimales y miles con punto:
+    1234567.891 -> '1.234.567,89'
+    """
     try:
-        return locale.format_string('%.2f', val, grouping=True)
+        return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except:
         return val
 
@@ -168,7 +168,7 @@ def analizar_SP500_profesional(ticker_symbol):
     except:
         return None
 
-# ================== Cache + Progress Bar con % ==================
+# ================== Cache + Barra de progreso ==================
 @st.cache_data(show_spinner=True, ttl=3600, max_entries=3)
 def generar_scanner(cache_key):
     resultados = []
@@ -184,6 +184,7 @@ def generar_scanner(cache_key):
         progress_bar.progress(porcentaje/100)
         pct_text.text(f"Procesando acciones: {porcentaje}%")
     
+    # Quitar barra al finalizar
     progress_bar.empty()
     pct_text.empty()
     
@@ -192,7 +193,7 @@ def generar_scanner(cache_key):
         df = df.sort_values(by="Score", ascending=False)
     return df
 
-# ================== Cargar datos ==================
+# ================== Cargar datos iniciales ==================
 if 'df' not in st.session_state:
     st.session_state['df'] = generar_scanner("scanner_sp500_v2")
     st.session_state['last_refresh'] = datetime.now()
@@ -209,10 +210,8 @@ st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refres
 
 # ================== Filtros profesionales ==================
 st.sidebar.header("Filtros")
-
 score_min, score_max = st.sidebar.slider("Score (1-10)", 1.0, 10.0, (1.0,10.0), step=0.1)
 señales_seleccionadas = st.sidebar.multiselect("Filtrar por Señal", options=df["Señal"].unique(), default=list(df["Señal"].unique()))
-
 df_filtrado = df[(df["Score"] >= score_min) & (df["Score"] <= score_max) & (df["Señal"].isin(señales_seleccionadas))]
 
 if df_filtrado.empty:
