@@ -242,6 +242,7 @@ if not df_restantes.empty:
         .format(formato_columnas),
         use_container_width=True
     )
+    
 with tab2:
     ticker = accion_global.split(" - ")[0]
     hist = yf.Ticker(ticker).history(period="1y")
