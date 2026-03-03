@@ -15,7 +15,7 @@ FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
 ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7
 
-# ================== TICKERS ==================
+# ================== Tickers ==================
 sp500_tickers = [
 "AAPL","ABBV","ABNB","ABT","ACGL","ACN","ADBE","ADI","ADM","ADP",
 "ADSK","AEE","AEP","AES","AFL","AIG","AIZ","AJG","AKAM","ALB",
@@ -24,56 +24,57 @@ sp500_tickers = [
 "AVB","AVGO","AVY","AXP","AZO","BA","BAC","BALL","BAX","BBWI",
 "BBY","BDX","BEN","BF.B","BG","BIIB","BK","BKNG","BKR","BLK",
 "BMY","BR","BRK.B","BSX","BWA","C","CAG","CAH","CARR","CAT",
-"CB","CBRE","CCI","CCL","CDNS","CEG","CF","CFG","CHD",
+"CB","CBRE","CCI","CCL","CDNS","CEG","CERN","CF","CFG","CHD",
 "CHRW","CHTR","CI","CINF","CL","CLX","CMA","CMCSA","CME","CMG",
-"COF","COO","COP","COST","CPRT","CRM","CSCO","CSX",
-"CTAS","CTSH","CTVA","CVS","CVX","DD","DE","DFS",
-"DG","DGX","DHI","DHR","DIS","DOW","DPZ",
-"DRI","DTE","DUK","DVA","DVN","EA","EBAY","ECL",
-"ED","EFX","EIX","EL","EMN","EMR","ENPH","EOG","EQIX",
-"ESS","ETN","ETR","EW","EXC","EXPD","EXPE","F","FAST",
-"FCX","FDX","FE","FIS","FISV","FITB","FLT",
-"FMC","FOXA","FOX","FTNT","FTV","GD",
-"GE","GILD","GIS","GL","GLW","GM","GOOG","GOOGL",
-"GS","GWW","HAL","HAS","HBAN","HCA",
-"HD","HES","HIG","HLT","HON","HPQ","HRL",
-"HSY","HUM","IBM","ICE","IFF","ILMN",
-"INTC","INTU","IP","IQV","IRM","ISRG","ITW",
-"JCI","JNJ","JPM","K","KEY","KHC",
-"KLAC","KO","KR","LEN","LH","LIN",
-"LLY","LMT","LOW","LRCX","LUV","MA","MCD",
-"MCHP","MCK","MCO","MDLZ","MDT","MET","MGM",
-"MKC","MLM","MMC","MMM","MNST","MO","MOS",
-"MPC","MRK","MS","MSFT","MSI","MTB","MTD",
-"MU","NFLX","NI","NKE","NRG","NSC",
-"NTRS","NUE","NVDA","NXPI","O","ODFL",
-"OKE","OMC","ORCL","ORLY","OTIS","OXY",
-"PAYX","PCAR","PFG","PG","PGR","PH",
-"PLD","PM","PNC","PPG","PRU","PSA",
-"PSX","PYPL","QCOM","RCL","REGN","RF",
-"RJF","RMD","ROK","ROP","ROST","RTX",
-"SBUX","SCHW","SHW","SLB","SNPS","SO",
-"SPG","SPGI","SRE","STE","STT","STZ",
-"SYK","SYY","T","TFC","TGT","TJX",
-"TMO","TMUS","TRV","TSCO","TSLA","TSN",
-"TT","TXN","UAL","UDR","ULTA","UNH",
-"UNP","UPS","USB","V","VLO","VRTX",
-"VZ","WAB","WAT","WBA","WDC","WEC",
-"WELL","WFC","WM","WMT","WRB",
-"XEL","XOM","XYL","YUM","ZBH","ZBRA","ZION","ZTS"
+"COF","COG","COO","COP","COST","CPB","CPRT","CRM","CSCO","CSX",
+"CTAS","CTL","CTSH","CTVA","CVS","CVX","CZR","DD","DE","DFS",
+"DG","DGX","DHI","DHR","DIS","DISCA","DISCK","DOW","DOX","DPZ",
+"DRE","DRI","DTE","DUK","DVA","DVN","DXC","EA","EBAY","ECL",
+"ED","EFX","EIX","EL","EME","EMN","EMR","ENPH","EOG","EQIX","EQT",
+"ESS","ETN","ETR","EVRG","EW","EXC","EXPD","EXPE","F","FAST",
+"FBHS","FCX","FDX","FE","FIS","FISV","FITB","FL","FLS","FLT",
+"FMC","FOXA","FOX","FPH","FRC","FRT","FTI","FTNT","FTV","GD",
+"GE","GILD","GIS","GL","GLW","GM","GOOG","GOOGL","GPC","GPN",
+"GPS","GRMN","GS","GT","GWW","HAL","HAS","HBAN","HCA","HCP",
+"HD","HES","HIG","HII","HLT","HOG","HOLX","HON","HPQ","HRL",
+"HSIC","HST","HSY","HTZ","HUM","IBM","ICE","IFF","ILMN","INCY",
+"INFO","INTC","INTU","IP","IPG","IQV","IR","IRM","ISRG","IT",
+"ITW","IVZ","J","JBHT","JCI","JKHY","JNJ","JPM","JWN","K",
+"KEY","KEYS","KHC","KIM","KMI","KLAC","KMX","KO","KR","KSU",
+"L","LAD","LB","LDOS","LDL","LEG","LEN","LH","LHX","LIN",
+"LKQ","LLY","LMT","LNC","LNT","LOW","LRCX","LUV","LYB","M",
+"MA","MCD","MCHP","MCK","MCO","MDLZ","MDT","MET","MGM","MHK",
+"MKC","MKTX","MLM","MMC","MMM","MNST","MO","MOS","MPC","MRK",
+"MRO","MS","MSFT","MSI","MTB","MTD","MU","NFLX","NI","NKE",
+"NLOK","NOV","NRG","NSC","NTAP","NTRS","NUE","NVDA","NVR","NWL",
+"NWS","NWSA","NXPI","O","ODFL","OGN","OKE","OMC","ORCL","ORLY",
+"OTIS","OXY","PAYC","PAYX","PBCT","PCAR","PCG","PFG","PG","PGR",
+"PH","PHM","PKG","PKI","PLD","PM","PNC","PNR","PNW","PPG",
+"PPL","PRGO","PRU","PSA","PSX","PVH","PWR","PXD","PYPL","QCOM",
+"QRVO","RCL","RE","REG","REGN","RF","RHI","RJF","RL","RMD",
+"ROK","ROL","ROP","ROST","RSG","RTX","SBAC","SBUX","SCHW","SEE",
+"SHW","SIVB","SJM","SLB","SNA","SNPS","SO","SPG","SPGI","SRE",
+"STE","STT","STZ","SWK","SWKS","SYF","SYK","SYY","T","TAK",
+"TBH","TDG","TEL","TER","TFC","TGT","TIF","TJX","TMO","TMUS",
+"TPR","TRGP","TRV","TSCO","TSLA","TSN","TT","TUB","TWTR","TXN",
+"TXT","TZOO","UAL","UDR","UHS","ULTA","UNH","UNM","UNP","UPS",
+"URI","USB","V","VAR","VFC","VLO","VMC","VNO","VRTX","VTR",
+"VZ","WAB","WAT","WBA","WB","WDC","WEC","WELL","WFC","WFT",
+"WHR","WLTW","WM","WMB","WMT","WRB","WRK","WY","WYNN","XEL",
+"XLNX","XOM","XRAY","XRX","XYL","YUM","ZBH","ZBRA","ZION","ZTS"
 ]
 
-# ================== FUNCIÓN ANALÍTICA ==================
+# ================== FUNCIONES ==================
 def analizar_SP500_profesional(ticker_symbol):
     try:
         yf_ticker = ticker_symbol.replace('.', '-')
         t = yf.Ticker(yf_ticker)
         hist = t.history(period="15mo")
-
         if hist.empty or len(hist) < 200:
             return None
 
         nombre_accion = t.info.get('longName', ticker_symbol)
+        hist.columns = [col[0] if isinstance(col, tuple) else col for col in hist.columns]
 
         c_actual = hist['Close'].iloc[-1]
         h_5d = hist['High'].tail(5).max()
@@ -83,11 +84,13 @@ def analizar_SP500_profesional(ticker_symbol):
         resistencia = (2 * pivot) - l_5d
         soporte = (2 * pivot) - h_5d
 
-        rsi = ta.momentum.RSIIndicator(hist['Close'], 14).rsi().iloc[-1]
-        sma20 = hist['Close'].rolling(20).mean().iloc[-1]
-        sma50 = hist['Close'].rolling(50).mean().iloc[-1]
-        sma200 = hist['Close'].rolling(200).mean().iloc[-1]
-
+        rsi = ta.momentum.RSIIndicator(hist['Close'], window=14).rsi().iloc[-1]
+        sma20 = ta.trend.sma_indicator(hist['Close'], window=20).iloc[-1]
+        sma50 = ta.trend.sma_indicator(hist['Close'], window=50).iloc[-1]
+        sma200 = ta.trend.sma_indicator(hist['Close'], window=200).iloc[-1]
+        atr = ta.volatility.AverageTrueRange(hist['High'], hist['Low'], hist['Close'], window=14).average_true_range().iloc[-1]
+        atr_ratio = atr / c_actual
+        volatilidad = hist['Close'].pct_change().rolling(252).std().iloc[-1] * (252**0.5)
         vol_actual = hist['Volume'].iloc[-1]
         vol_medio_mes = hist['Volume'].tail(21).mean()
         vol_relativo = vol_actual / vol_medio_mes
@@ -107,18 +110,36 @@ def analizar_SP500_profesional(ticker_symbol):
         else:
             señal = "SELL"
 
+        stop_loss = max(soporte, c_actual - 1.5*atr)
+        take_profit = min(resistencia, c_actual + 2*atr)
+
         return {
             "Ticker": ticker_symbol,
             "Nombre": nombre_accion,
-            "Precio": round(c_actual, 2),
+            "Precio": round(c_actual,2),
             "Score": score,
-            "Señal": señal
+            "Señal": señal,
+            "RSI": round(rsi,2),
+            "SMA20": round(sma20,2),
+            "SMA50": round(sma50,2),
+            "SMA200": round(sma200,2),
+            "ATR": round(atr,2),
+            "ATR Ratio": round(atr_ratio,4),
+            "Volatilidad Anual": round(volatilidad,4),
+            "Volumen Actual": int(vol_actual),
+            "Volumen Medio (Mes)": int(vol_medio_mes),
+            "Volumen Relativo": round(vol_relativo,2),
+            "Soporte": round(soporte,2),
+            "Resistencia": round(resistencia,2),
+            "Stop Loss": round(stop_loss,2),
+            "Take Profit": round(take_profit,2)
         }
 
-    except:
+    except Exception as e:
+        print(f"❌ Error en {ticker_symbol}: {e}")
         return None
 
-# ================== SCANNER ==================
+# ================== GENERAR CSV EN MEMORIA ==================
 @st.cache_data(show_spinner=True)
 def generar_scanner():
     resultados = []
@@ -126,45 +147,31 @@ def generar_scanner():
         res = analizar_SP500_profesional(tick)
         if res:
             resultados.append(res)
-
-    df = pd.DataFrame(resultados)
-    if not df.empty:
-        df = df.sort_values(by="Score", ascending=False)
-
+    df = pd.DataFrame(resultados).sort_values(by="Score", ascending=False)
     return df
 
-# ================== BOTÓN ==================
+# ================== BOTÓN ACTUALIZAR ==================
 if st.button("🔄 Actualizar datos del Scanner"):
     with st.spinner("Ejecutando scanner..."):
         df = generar_scanner()
     st.success("Datos actualizados correctamente")
 
-# ================== CARGA INICIAL ==================
+# ================== CARGAR DATAFRAME ==================
 try:
     df
-except:
-    df = generar_scanner()
-
-if df.empty:
-    st.error("No se generaron datos")
-    st.stop()
+except NameError:
+    try:
+        df = generar_scanner()
+    except Exception as e:
+        st.error(f"No se pudo generar el scanner: {e}")
+        st.stop()
 
 # ================== FILTROS ==================
 st.sidebar.header("Filtros")
-
-score_min, score_max = st.sidebar.slider(
-    "Rango de Score",
-    min_value=0,
-    max_value=10,
-    value=(0, 10)
-)
-
+score_min = st.sidebar.slider("Score mínimo", 0, 10, 0)
+score_max = st.sidebar.slider("Score máximo", 0, 10, 10)
 señales = df["Señal"].unique()
-señal_filtrada = st.sidebar.multiselect(
-    "Filtrar por Señal",
-    señales,
-    default=señales
-)
+señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
 
 df_filtrado = df[
     (df["Score"] >= score_min) &
@@ -172,37 +179,28 @@ df_filtrado = df[
     (df["Señal"].isin(señal_filtrada))
 ]
 
-# ================== INFO DEBUG ==================
-st.write("Total acciones escaneadas:", len(df))
-st.write("Total después de filtros:", len(df_filtrado))
-
-# ================== TABLA ==================
 st.dataframe(df_filtrado, use_container_width=True)
-
 if df_filtrado.empty:
     st.stop()
 
 # ================== SELECTOR ==================
-accion = st.selectbox(
-    "Selecciona una acción",
-    df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"]
-)
-
+accion = st.selectbox("Selecciona una acción",
+                      df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"])
 ticker = accion.split(" - ")[0]
+fila = df_filtrado[df_filtrado["Ticker"] == ticker].iloc[0]
 
-# ================== GRÁFICO ==================
+# ================== HISTÓRICO ==================
 hist = yf.Ticker(ticker).history(period="1y")
+if hist.empty:
+    st.error("No se pudieron descargar datos históricos")
+    st.stop()
 
 hist["SMA20"] = hist["Close"].rolling(20).mean()
 hist["SMA50"] = hist["Close"].rolling(50).mean()
 hist["SMA200"] = hist["Close"].rolling(200).mean()
 
-fig = make_subplots(
-    rows=2, cols=1,
-    shared_xaxes=True,
-    vertical_spacing=0.05,
-    row_heights=[0.7, 0.3]
-)
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                    vertical_spacing=0.05, row_heights=[0.7, 0.3])
 
 fig.add_trace(go.Candlestick(
     x=hist.index,
@@ -217,11 +215,64 @@ fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA20"], name="SMA20"), row=1, co
 fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA50"], name="SMA50"), row=1, col=1)
 fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA200"], name="SMA200"), row=1, col=1)
 
-fig.add_trace(go.Bar(
-    x=hist.index,
-    y=hist["Volume"],
-    name="Volumen"
-), row=2, col=1)
-
+fig.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volumen"), row=2, col=1)
 fig.update_layout(xaxis_rangeslider_visible=False, height=800)
 st.plotly_chart(fig, use_container_width=True)
+
+# ================== FINNHUB ==================
+def obtener_earnings_futuros(ticker):
+    url = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now() + timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
+    r = requests.get(url).json()
+    return r.get("earningsCalendar", []) if isinstance(r, dict) else []
+
+def obtener_earnings_pasados(ticker):
+    url = f"https://finnhub.io/api/v1/stock/earnings?symbol={ticker}&token={FINNHUB_API_KEY}"
+    r = requests.get(url).json()
+    return r if isinstance(r, list) else []
+
+def obtener_noticias(ticker):
+    fecha_fin = datetime.now().date()
+    fecha_inicio = fecha_fin - timedelta(days=VENTANA_NOTICIAS_DIAS)
+    url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={fecha_inicio}&to={fecha_fin}&token={FINNHUB_API_KEY}"
+    r = requests.get(url).json()
+    return r if isinstance(r, list) else []
+
+future_earnings = obtener_earnings_futuros(ticker)
+past_earnings = obtener_earnings_pasados(ticker)
+noticias = obtener_noticias(ticker)
+
+# ================== PRÓXIMOS RESULTADOS ==================
+st.subheader("📅 Próximos resultados")
+if future_earnings:
+    for e in future_earnings:
+        fecha = e.get("date")
+        hora = e.get("hour", "")
+        st.write(f"📌 {fecha} {hora}")
+    fecha_resultado = pd.to_datetime(future_earnings[0].get("date"))
+    dias_restantes = (fecha_resultado.date() - datetime.now().date()).days
+    if dias_restantes <= ALERTA_DIAS:
+        st.warning(f"🚨 Resultados en {dias_restantes} días")
+else:
+    st.info("No hay próximos resultados disponibles.")
+
+# ================== RESULTADOS ANTERIORES ==================
+st.subheader("📊 Resultados anteriores")
+if past_earnings:
+    for e in past_earnings[:6]:
+        st.write(
+            f"{e.get('period')} | Actual: {e.get('actual')} | Estimado: {e.get('estimate')} | Surprise: {e.get('surprisePercent')}%"
+        )
+else:
+    st.info("No hay resultados anteriores disponibles.")
+
+# ================== NOTICIAS ==================
+st.subheader(f"📰 Noticias últimos {VENTANA_NOTICIAS_DIAS} días")
+if noticias:
+    for n in noticias:
+        fecha = datetime.fromtimestamp(n.get("datetime"))
+        st.markdown(f"**{n.get('headline')}**")
+        st.write(f"{n.get('source')} | {fecha.strftime('%d/%m/%Y')}")
+        st.write(f"[Leer noticia]({n.get('url')})")
+        st.markdown("---")
+else:
+    st.info("No hay noticias disponibles en los últimos días.")
