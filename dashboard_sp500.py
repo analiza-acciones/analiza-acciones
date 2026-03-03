@@ -8,7 +8,7 @@ from plotly.subplots import make_subplots
 import requests
 
 st.set_page_config(page_title="Dashboard SP500", layout="wide")
-st.title("📊 Dashboard Profesional S&P500")
+st.title("📊 S&P500")
 
 # ================== CONFIG ==================
 FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
