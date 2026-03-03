@@ -102,7 +102,6 @@ def analizar_SP500_profesional(ticker_symbol):
         vol_relativo = vol_actual / vol_medio_mes
 
         # ================== SCORE 1-10 ==================
-        # Fundamentales
         per = t.info.get('trailingPE', None)
         roe = t.info.get('returnOnEquity', None)
         deuda_equity = t.info.get('debtToEquity', None)
@@ -162,14 +161,19 @@ def analizar_SP500_profesional(ticker_symbol):
         print(f"Error analizando {ticker_symbol}: {e}")
         return None
 
-# ================== Cache ==================
+# ================== Cache + Progress Bar ==================
 @st.cache_data(show_spinner=True, ttl=3600, max_entries=3)
 def generar_scanner(cache_key):
     resultados = []
-    for tick in sp500_tickers:
+    total = len(sp500_tickers)
+    progress_bar = st.progress(0)
+    
+    for i, tick in enumerate(sp500_tickers):
         res = analizar_SP500_profesional(tick)
         if res:
             resultados.append(res)
+        progress_bar.progress((i+1)/total)
+    
     df = pd.DataFrame(resultados)
     if "Score" in df.columns:
         df = df.sort_values(by="Score", ascending=False)
@@ -206,18 +210,28 @@ if df_filtrado.empty:
 
 accion_global = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="accion_global")
 
+# ================== Semáforo visual ==================
+def color_score(val):
+    if val >= 7:
+        color = 'background-color: #2ECC71; color: white'  # verde
+    elif val >= 4:
+        color = 'background-color: #F1C40F; color: black'  # amarillo
+    else:
+        color = 'background-color: #E74C3C; color: white'  # rojo
+    return color
+
 # ================== Tabs ==================
 tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
 
 with tab1:
     df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
     st.subheader("📌 Acción seleccionada")
-    st.dataframe(df_accion, use_container_width=True)
+    st.dataframe(df_accion.style.applymap(color_score, subset=['Score']), use_container_width=True)
 
     df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
     if not df_restantes.empty:
         st.subheader("📊 Resto de acciones filtradas")
-        st.dataframe(df_restantes, use_container_width=True)
+        st.dataframe(df_restantes.style.applymap(color_score, subset=['Score']), use_container_width=True)
 
 with tab2:
     ticker = accion_global.split(" - ")[0]
