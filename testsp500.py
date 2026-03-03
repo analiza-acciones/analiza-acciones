@@ -15,7 +15,7 @@ FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
 ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7
 
-# ================== Lista de tickers ==================
+
 # ================== Lista de tickers ==================
 sp500_tickers = [
 "AAPL","ABBV","ABNB","ABT","ACGL","ACN","ADBE","ADI","ADM","ADP",
@@ -189,8 +189,16 @@ tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultad
 
 # ------------------ TAB 1: Acciones ------------------
 with tab1:
+    # Tabla de la acción seleccionada
     df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
+    st.subheader("📌 Acción seleccionada")
     st.dataframe(df_accion, use_container_width=True)
+
+    # Tabla con el resto de acciones filtradas
+    df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
+    if not df_restantes.empty:
+        st.subheader("📊 Resto de acciones filtradas")
+        st.dataframe(df_restantes, use_container_width=True)
 
 # ------------------ TAB 2: Gráfico ------------------
 with tab2:
