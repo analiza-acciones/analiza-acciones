@@ -17,51 +17,8 @@ VENTANA_NOTICIAS_DIAS = 7
 
 # ================== Lista de tickers ==================
 sp500_tickers = [
-"AAPL","ABBV","ABNB","ABT","ACGL","ACN","ADBE","ADI","ADM","ADP",
-"ADSK","AEE","AEP","AES","AFL","AIG","AIZ","AJG","AKAM","ALB",
-"ALGN","ALLE","ALL","AMAT","AMD","AME","AMGN","AMP","AMT",
-"AMZN","ANET","ANSS","AON","APA","APD","APH","APTV","ARE","ATO",
-"AVB","AVGO","AVY","AXP","AZO","BA","BAC","BALL","BAX","BBWI",
-"BBY","BDX","BEN","BF.B","BG","BIIB","BK","BKNG","BKR","BLK",
-"BMY","BR","BRK.B","BSX","BWA","C","CAG","CAH","CARR","CAT",
-"CB","CBRE","CCI","CCL","CDNS","CEG","CERN","CF","CFG","CHD",
-"CHRW","CHTR","CI","CINF","CL","CLX","CMA","CMCSA","CME","CMG",
-"COF","COG","COO","COP","COST","CPB","CPRT","CRM","CSCO","CSX",
-"CTAS","CTL","CTSH","CTVA","CVS","CVX","CZR","DD","DE","DFS",
-"DG","DGX","DHI","DHR","DIS","DISCA","DISCK","DOW","DOX","DPZ",
-"DRE","DRI","DTE","DUK","DVA","DVN","DXC","EA","EBAY","ECL",
-"ED","EFX","EIX","EL","EME","EMN","EMR","ENPH","EOG","EQIX","EQT",
-"ESS","ETN","ETR","EVRG","EW","EXC","EXPD","EXPE","F","FAST",
-"FBHS","FCX","FDX","FE","FIS","FISV","FITB","FL","FLS","FLT",
-"FMC","FOXA","FOX","FPH","FRC","FRT","FTI","FTNT","FTV","GD",
-"GE","GILD","GIS","GL","GLW","GM","GOOG","GOOGL","GPC","GPN",
-"GPS","GRMN","GS","GT","GWW","HAL","HAS","HBAN","HCA","HCP",
-"HD","HES","HIG","HII","HLT","HOG","HOLX","HON","HPQ","HRL",
-"HSIC","HST","HSY","HTZ","HUM","IBM","ICE","IFF","ILMN","INCY",
-"INFO","INTC","INTU","IP","IPG","IQV","IR","IRM","ISRG","IT",
-"ITW","IVZ","J","JBHT","JCI","JKHY","JNJ","JPM","JWN","K",
-"KEY","KEYS","KHC","KIM","KMI","KLAC","KMX","KO","KR","KSU",
-"L","LAD","LB","LDOS","LDL","LEG","LEN","LH","LHX","LIN",
-"LKQ","LLY","LMT","LNC","LNT","LOW","LRCX","LUV","LYB","M",
-"MA","MCD","MCHP","MCK","MCO","MDLZ","MDT","MET","MGM","MHK",
-"MKC","MKTX","MLM","MMC","MMM","MNST","MO","MOS","MPC","MRK",
-"MRO","MS","MSFT","MSI","MTB","MTD","MU","NFLX","NI","NKE",
-"NLOK","NOV","NRG","NSC","NTAP","NTRS","NUE","NVDA","NVR","NWL",
-"NWS","NWSA","NXPI","O","ODFL","OGN","OKE","OMC","ORCL","ORLY",
-"OTIS","OXY","PAYC","PAYX","PBCT","PCAR","PCG","PFG","PG","PGR",
-"PH","PHM","PKG","PKI","PLD","PM","PNC","PNR","PNW","PPG",
-"PPL","PRGO","PRU","PSA","PSX","PVH","PWR","PXD","PYPL","QCOM",
-"QRVO","RCL","RE","REG","REGN","RF","RHI","RJF","RL","RMD",
-"ROK","ROL","ROP","ROST","RSG","RTX","SBAC","SBUX","SCHW","SEE",
-"SHW","SIVB","SJM","SLB","SNA","SNPS","SO","SPG","SPGI","SRE",
-"STE","STT","STZ","SWK","SWKS","SYF","SYK","SYY","T","TAK",
-"TBH","TDG","TEL","TER","TFC","TGT","TIF","TJX","TMO","TMUS",
-"TPR","TRGP","TRV","TSCO","TSLA","TSN","TT","TUB","TWTR","TXN",
-"TXT","TZOO","UAL","UDR","UHS","ULTA","UNH","UNM","UNP","UPS",
-"URI","USB","V","VAR","VFC","VLO","VMC","VNO","VRTX","VTR",
-"VZ","WAB","WAT","WBA","WB","WDC","WEC","WELL","WFC","WFT",
-"WHR","WLTW","WM","WMB","WMT","WRB","WRK","WY","WYNN","XEL",
-"XLNX","XOM","XRAY","XRX","XYL","YUM","ZBH","ZBRA","ZION","ZTS"
+"AAPL","MSFT","AMZN","GOOGL","GOOG","TSLA","NVDA","META","BRK.B","JPM",
+"UNH","V","HD","PG","MA","DIS","KO","PEP","CMCSA","INTC"
 ]
 
 # ================== FUNCIONES ==================
@@ -151,51 +108,49 @@ def generar_scanner(cache_key):
         df = df.sort_values(by="Score", ascending=False)
     return df
 
-# ================== Botón refrescar datos ==================
+# ================== Cargar datos iniciales ==================
 if 'df' not in st.session_state:
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
 
+# ================== Botón actualizar ==================
 if st.button("Actualizar datos"):
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
 
 df = st.session_state['df']
 
-# ================== Hora actual y última actualización ==================
+# ================== Barra lateral ==================
 st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%H:%M:%S')}")
 st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
 
-# ================== Filtros sidebar ==================
+# ================== Filtros ==================
 st.sidebar.header("Filtros")
-# Filtro de score con selección múltiple
 score_values = sorted(df["Score"].unique())
 score_seleccionado = st.sidebar.multiselect("Score", score_values, default=score_values)
-
 señales = df["Señal"].unique()
 señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
 
-df_filtrado = df[
-    (df["Score"].isin(score_seleccionado)) &
-    (df["Señal"].isin(señal_filtrada))
-]
+df_filtrado = df[(df["Score"].isin(score_seleccionado)) & (df["Señal"].isin(señal_filtrada))]
 
 if df_filtrado.empty:
     st.warning("No hay datos para los filtros seleccionados.")
     st.stop()
+
+# ================== Selección de acción global ==================
+accion_global = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="accion_global")
 
 # ================== Tabs ==================
 tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
 
 # ------------------ TAB 1: Acciones ------------------
 with tab1:
-    accion_acciones = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="acciones_select")
-    st.dataframe(df_filtrado, use_container_width=True)
+    df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
+    st.dataframe(df_accion, use_container_width=True)
 
 # ------------------ TAB 2: Gráfico ------------------
 with tab2:
-    accion_graf = st.selectbox("Selecciona acción para gráfico", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="grafico_select")
-    ticker = accion_graf.split(" - ")[0]
+    ticker = accion_global.split(" - ")[0]
     hist = yf.Ticker(ticker).history(period="1y")
     hist["SMA20"] = hist["Close"].rolling(20).mean()
     hist["SMA50"] = hist["Close"].rolling(50).mean()
@@ -221,9 +176,7 @@ with tab2:
 
 # ------------------ TAB 3: Resultados ------------------
 with tab3:
-    accion_earn = st.selectbox("Selecciona acción para Resultados", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="earnings_select")
-    ticker = accion_earn.split(" - ")[0]
-
+    ticker = accion_global.split(" - ")[0]
     url_fut = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now() + timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
     future_earnings = requests.get(url_fut).json().get("earningsCalendar", [])
 
@@ -251,8 +204,7 @@ with tab3:
 
 # ------------------ TAB 4: Noticias ------------------
 with tab4:
-    accion_news = st.selectbox("Selecciona acción para Noticias", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="news_select")
-    ticker = accion_news.split(" - ")[0]
+    ticker = accion_global.split(" - ")[0]
     fecha_fin = datetime.now().date()
     fecha_inicio = fecha_fin - timedelta(days=VENTANA_NOTICIAS_DIAS)
     url_news = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={fecha_inicio}&to={fecha_fin}&token={FINNHUB_API_KEY}"
@@ -268,5 +220,3 @@ with tab4:
             st.markdown("---")
     else:
         st.info("No hay noticias recientes.")
-
-
