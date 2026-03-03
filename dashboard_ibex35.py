@@ -16,7 +16,7 @@ ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7
 
 # ================== Tickers ==================
-ibex35_tickers = [
+sp500_tickers = [
     "ACS.MC","ACX.MC","AENA.MC","AMS.MC","ANA.MC","BBVA.MC","BKT.MC",
     "CABK.MC","CLNX.MC","COL.MC","ENG.MC","ELE.MC","FER.MC","FDR.MC",
     "GRF.MC","IAG.MC","IBE.MC","IDR.MC","ITX.MC","LOG.MC","MAP.MC",
