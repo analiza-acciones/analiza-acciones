@@ -176,16 +176,31 @@ if st.button("Actualizar datos"):
 
 df = st.session_state['df']
 
+# ================== SIDEBAR ==================
 st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%H:%M:%S')}")
 st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
 
 st.sidebar.header("Filtros")
-score_values = sorted(df["Score"].unique())
-score_seleccionado = st.sidebar.multiselect("Score", score_values, default=score_values)
+
+# Slider para Score
+score_min, score_max = st.sidebar.slider(
+    "Score",
+    min_value=float(df["Score"].min()),
+    max_value=float(df["Score"].max()),
+    value=(float(df["Score"].min()), float(df["Score"].max())),
+    step=0.1
+)
+
+# Filtrar señales
 señales = df["Señal"].unique()
 señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
 
-df_filtrado = df[(df["Score"].isin(score_seleccionado)) & (df["Señal"].isin(señal_filtrada))]
+# Filtrado del DataFrame
+df_filtrado = df[
+    (df["Score"] >= score_min) & 
+    (df["Score"] <= score_max) &
+    (df["Señal"].isin(señal_filtrada))
+]
 
 if df_filtrado.empty:
     st.warning("No hay datos para los filtros seleccionados.")
@@ -201,8 +216,17 @@ def color_score(val):
     else:
         return 'background-color: #E74C3C; color: white'
 
+# Agregar barra de progreso visual en la tabla
+def score_bar(val):
+    color = "#2ECC71" if val >= 7 else "#F1C40F" if val >= 4 else "#E74C3C"
+    porcentaje = int(val*10)
+    return f"""
+    <div style="background-color:#ddd; width:100%; border-radius:4px;">
+        <div style="width:{porcentaje}%; background-color:{color}; text-align:center; color:white; border-radius:4px;">{val}</div>
+    </div>
+    """
 
-# ================== Tabs ==================
+# ================== TABS ==================
 tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
 
 # ================== TAB 1 - ACCIONES ==================
@@ -212,7 +236,6 @@ with tab1:
 
     formato_columnas = {
         "Precio": "{:.2f}",
-        "Score": "{:.1f}",
         "RSI": "{:.2f}",
         "SMA20": "{:.2f}",
         "SMA50": "{:.2f}",
@@ -229,23 +252,14 @@ with tab1:
         "Take Profit": "{:.2f}"
     }
 
-    st.dataframe(
-        df_accion.style
-        .applymap(color_score, subset=['Score'])
-        .format(formato_columnas),
-        use_container_width=True
-    )
+    # Tabla con Score como barra
+    st.write(df_accion.to_html(escape=False, formatters={"Score": score_bar}), unsafe_allow_html=True)
 
-    # Resto de acciones filtradas
+    # Resto de acciones
     df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
     if not df_restantes.empty:
         st.subheader("📊 Resto de acciones")
-        st.dataframe(
-            df_restantes.style
-            .applymap(color_score, subset=['Score'])
-            .format(formato_columnas),
-            use_container_width=True
-        )
+        st.write(df_restantes.to_html(escape=False, formatters={"Score": score_bar}), unsafe_allow_html=True)
 
 # ================== TAB 2 - GRÁFICO ==================
 with tab2:
