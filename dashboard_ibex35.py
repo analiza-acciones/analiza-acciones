@@ -27,7 +27,8 @@ ibex35_tickers = [
 # ================== FUNCIONES ==================
 def analizar_ibex35_profesional(ticker_symbol):
     try:
-        t = yf.Ticker(ticker_symbol)
+        yf_ticker = ticker_symbol.replace('.', '-')
+        t = yf.Ticker(yf_ticker)
         hist = t.history(period="15mo")
         if hist.empty or len(hist) < 200:
             return None
@@ -54,6 +55,7 @@ def analizar_ibex35_profesional(ticker_symbol):
         vol_medio_mes = hist['Volume'].tail(21).mean()
         vol_relativo = vol_actual / vol_medio_mes
 
+        # ================== SCORE ==================
         score = 0
         if rsi < 40: score += 2
         elif rsi > 70: score -= 2
@@ -100,7 +102,7 @@ def analizar_ibex35_profesional(ticker_symbol):
 
 # ================== GENERAR CSV EN MEMORIA ==================
 @st.cache_data(show_spinner=True)
-def generar_scanner():
+def generar_scanner_ibex35():
     resultados = []
     for tick in ibex35_tickers:
         res = analizar_ibex35_profesional(tick)
@@ -110,32 +112,32 @@ def generar_scanner():
     return df
 
 # ================== BOTÓN ACTUALIZAR ==================
-if st.button("🔄 Actualizar datos del Scanner"):
-    with st.spinner("Ejecutando scanner..."):
-        df = generar_scanner()
-    st.success("Datos actualizados correctamente")
+if st.button("🔄 Actualizar datos del Scanner IBEX35"):
+    with st.spinner("Ejecutando scanner IBEX35..."):
+        df_ibex35 = generar_scanner_ibex35()
+    st.success("Datos IBEX35 actualizados correctamente")
 
 # ================== CARGAR DATAFRAME ==================
 try:
-    df
+    df_ibex35
 except NameError:
     try:
-        df = generar_scanner()
+        df_ibex35 = generar_scanner_ibex35()
     except Exception as e:
         st.error(f"No se pudo generar el scanner: {e}")
         st.stop()
 
 # ================== FILTROS ==================
-st.sidebar.header("Filtros")
+st.sidebar.header("Filtros IBEX35")
 score_min = st.sidebar.slider("Score mínimo", 0, 10, 0)
 score_max = st.sidebar.slider("Score máximo", 0, 10, 10)
-señales = df["Señal"].unique()
+señales = df_ibex35["Señal"].unique()
 señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
 
-df_filtrado = df[
-    (df["Score"] >= score_min) &
-    (df["Score"] <= score_max) &
-    (df["Señal"].isin(señal_filtrada))
+df_filtrado = df_ibex35[
+    (df_ibex35["Score"] >= score_min) &
+    (df_ibex35["Score"] <= score_max) &
+    (df_ibex35["Señal"].isin(señal_filtrada))
 ]
 
 st.dataframe(df_filtrado, use_container_width=True)
