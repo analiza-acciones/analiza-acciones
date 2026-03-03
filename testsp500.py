@@ -15,7 +15,6 @@ FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
 ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7
 
-
 # ================== Lista de tickers ==================
 sp500_tickers = [
 "AAPL","ABBV","ABNB","ABT","ACGL","ACN","ADBE","ADI","ADM","ADP",
@@ -66,6 +65,11 @@ sp500_tickers = [
 ]
 
 # ================== FUNCIONES ==================
+def normalize(value, min_val, max_val):
+    if value is None:
+        return 0.5
+    return max(0, min(1, (value - min_val)/(max_val - min_val)))
+
 def analizar_SP500_profesional(ticker_symbol):
     try:
         yf_ticker = ticker_symbol.replace('.', '-')
@@ -85,6 +89,7 @@ def analizar_SP500_profesional(ticker_symbol):
         resistencia = (2 * pivot) - l_5d
         soporte = (2 * pivot) - h_5d
 
+        # Indicadores técnicos
         rsi = ta.momentum.RSIIndicator(hist['Close'], window=14).rsi().iloc[-1]
         sma20 = ta.trend.sma_indicator(hist['Close'], window=20).iloc[-1]
         sma50 = ta.trend.sma_indicator(hist['Close'], window=50).iloc[-1]
@@ -96,17 +101,35 @@ def analizar_SP500_profesional(ticker_symbol):
         vol_medio_mes = hist['Volume'].tail(21).mean()
         vol_relativo = vol_actual / vol_medio_mes
 
-        score = 0
-        if rsi < 40: score += 2
-        elif rsi > 70: score -= 2
-        if c_actual > sma20: score += 2
-        if c_actual > sma50: score += 1
-        if c_actual > sma200: score += 1
-        if vol_relativo > 1.2: score += 1
+        # ================== SCORE 1-10 ==================
+        # Fundamentales
+        per = t.info.get('trailingPE', None)
+        roe = t.info.get('returnOnEquity', None)
+        deuda_equity = t.info.get('debtToEquity', None)
+        crecimiento_ingresos = t.info.get('revenueGrowth', None)
+        beta = t.info.get('beta', None)
 
-        if score >= 7:
+        # Normalización y pesos
+        score_per = 1 - normalize(per, 5, 50)
+        score_roe = normalize(roe, 0, 0.3)
+        score_deuda = 1 - normalize(deuda_equity, 0, 2)
+        score_crec = normalize(crecimiento_ingresos, 0, 0.3)
+        score_fund = (score_per*0.25 + score_roe*0.25 + score_deuda*0.25 + score_crec*0.25)
+
+        score_rsi = 1 - normalize(rsi, 30, 70)
+        score_sma = sum([1 if c_actual > sma else 0 for sma in [sma20, sma50, sma200]]) / 3
+        score_tec = (score_rsi*0.5 + score_sma*0.5)
+
+        score_vol = 1 - normalize(atr_ratio, 0.01, 0.1)
+        score_beta = 1 - normalize(beta, 0.5, 2)
+        score_riesgo = (score_vol*0.5 + score_beta*0.5)
+
+        score_final = score_fund*0.5 + score_tec*0.3 + score_riesgo*0.2
+        score_final_10 = round(score_final*10,1)
+
+        if score_final_10 >= 7:
             señal = "BUY"
-        elif score >= 4:
+        elif score_final_10 >= 4:
             señal = "HOLD"
         else:
             señal = "SELL"
@@ -118,7 +141,7 @@ def analizar_SP500_profesional(ticker_symbol):
             "Ticker": ticker_symbol,
             "Nombre": nombre_accion,
             "Precio": round(c_actual,2),
-            "Score": score,
+            "Score": score_final_10,
             "Señal": señal,
             "RSI": round(rsi,2),
             "SMA20": round(sma20,2),
@@ -139,7 +162,7 @@ def analizar_SP500_profesional(ticker_symbol):
         print(f"Error analizando {ticker_symbol}: {e}")
         return None
 
-# ================== Cache nominal ==================
+# ================== Cache ==================
 @st.cache_data(show_spinner=True, ttl=3600, max_entries=3)
 def generar_scanner(cache_key):
     resultados = []
@@ -181,26 +204,21 @@ if df_filtrado.empty:
     st.warning("No hay datos para los filtros seleccionados.")
     st.stop()
 
-# ================== Selección de acción global ==================
 accion_global = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="accion_global")
 
 # ================== Tabs ==================
 tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
 
-# ------------------ TAB 1: Acciones ------------------
 with tab1:
-    # Tabla de la acción seleccionada
     df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
     st.subheader("📌 Acción seleccionada")
     st.dataframe(df_accion, use_container_width=True)
 
-    # Tabla con el resto de acciones filtradas
     df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
     if not df_restantes.empty:
         st.subheader("📊 Resto de acciones filtradas")
         st.dataframe(df_restantes, use_container_width=True)
 
-# ------------------ TAB 2: Gráfico ------------------
 with tab2:
     ticker = accion_global.split(" - ")[0]
     hist = yf.Ticker(ticker).history(period="1y")
@@ -226,7 +244,6 @@ with tab2:
     fig.update_layout(xaxis_rangeslider_visible=False, height=800)
     st.plotly_chart(fig, use_container_width=True)
 
-# ------------------ TAB 3: Resultados ------------------
 with tab3:
     ticker = accion_global.split(" - ")[0]
     url_fut = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now() + timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
@@ -254,7 +271,6 @@ with tab3:
     else:
         st.info("No hay resultados anteriores disponibles.")
 
-# ------------------ TAB 4: Noticias ------------------
 with tab4:
     ticker = accion_global.split(" - ")[0]
     fecha_fin = datetime.now().date()
