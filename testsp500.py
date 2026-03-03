@@ -76,7 +76,6 @@ def analizar_SP500_profesional(ticker_symbol):
         t = yf.Ticker(yf_ticker)
         hist = t.history(period="15mo")
         if hist.empty or len(hist) < 200:
-            print(f"⚠️ No hay suficiente historial para {ticker_symbol}")
             return None
 
         nombre_accion = t.info.get('longName', ticker_symbol)
@@ -89,7 +88,6 @@ def analizar_SP500_profesional(ticker_symbol):
         resistencia = (2 * pivot) - l_5d
         soporte = (2 * pivot) - h_5d
 
-        # Indicadores técnicos
         rsi = ta.momentum.RSIIndicator(hist['Close'], window=14).rsi().iloc[-1]
         sma20 = ta.trend.sma_indicator(hist['Close'], window=20).iloc[-1]
         sma50 = ta.trend.sma_indicator(hist['Close'], window=50).iloc[-1]
@@ -101,14 +99,12 @@ def analizar_SP500_profesional(ticker_symbol):
         vol_medio_mes = hist['Volume'].tail(21).mean()
         vol_relativo = vol_actual / vol_medio_mes
 
-        # ================== SCORE 1-10 ==================
         per = t.info.get('trailingPE', None)
         roe = t.info.get('returnOnEquity', None)
         deuda_equity = t.info.get('debtToEquity', None)
         crecimiento_ingresos = t.info.get('revenueGrowth', None)
         beta = t.info.get('beta', None)
 
-        # Normalización y pesos
         score_per = 1 - normalize(per, 5, 50)
         score_roe = normalize(roe, 0, 0.3)
         score_deuda = 1 - normalize(deuda_equity, 0, 2)
@@ -126,12 +122,7 @@ def analizar_SP500_profesional(ticker_symbol):
         score_final = score_fund*0.5 + score_tec*0.3 + score_riesgo*0.2
         score_final_10 = round(score_final*10,1)
 
-        if score_final_10 >= 7:
-            señal = "BUY"
-        elif score_final_10 >= 4:
-            señal = "HOLD"
-        else:
-            señal = "SELL"
+        señal = "BUY" if score_final_10 >= 7 else "HOLD" if score_final_10 >= 4 else "SELL"
 
         stop_loss = max(soporte, c_actual - 1.5*atr)
         take_profit = min(resistencia, c_actual + 2*atr)
@@ -157,45 +148,37 @@ def analizar_SP500_profesional(ticker_symbol):
             "Stop Loss": round(stop_loss,2),
             "Take Profit": round(take_profit,2)
         }
-    except Exception as e:
-        print(f"Error analizando {ticker_symbol}: {e}")
+    except:
         return None
 
-# ================== Cache + Progress Bar ==================
 @st.cache_data(show_spinner=True, ttl=3600, max_entries=3)
 def generar_scanner(cache_key):
     resultados = []
     total = len(sp500_tickers)
     progress_bar = st.progress(0)
-    
     for i, tick in enumerate(sp500_tickers):
         res = analizar_SP500_profesional(tick)
         if res:
             resultados.append(res)
         progress_bar.progress((i+1)/total)
-    
     df = pd.DataFrame(resultados)
     if "Score" in df.columns:
         df = df.sort_values(by="Score", ascending=False)
     return df
 
-# ================== Cargar datos iniciales ==================
 if 'df' not in st.session_state:
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
 
-# ================== Botón actualizar ==================
 if st.button("Actualizar datos"):
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
 
 df = st.session_state['df']
 
-# ================== Barra lateral ==================
 st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%H:%M:%S')}")
 st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
 
-# ================== Filtros ==================
 st.sidebar.header("Filtros")
 score_values = sorted(df["Score"].unique())
 score_seleccionado = st.sidebar.multiselect("Score", score_values, default=score_values)
@@ -210,22 +193,18 @@ if df_filtrado.empty:
 
 accion_global = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="accion_global")
 
-# ================== Semáforo visual ==================
 def color_score(val):
     if val >= 7:
-        color = 'background-color: #2ECC71; color: white'  # verde
+        return 'background-color: #2ECC71; color: white'
     elif val >= 4:
-        color = 'background-color: #F1C40F; color: black'  # amarillo
+        return 'background-color: #F1C40F; color: black'
     else:
-        color = 'background-color: #E74C3C; color: white'  # rojo
-    return color
+        return 'background-color: #E74C3C; color: white'
 
-# ================== Tabs ==================
 tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
 
 with tab1:
     df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
-    st.subheader("📌 Acción seleccionada")
 
     formato_columnas = {
         "Precio": "{:.2f}",
@@ -237,8 +216,8 @@ with tab1:
         "ATR": "{:.2f}",
         "ATR Ratio": "{:.4f}",
         "Volatilidad Anual": "{:.4f}",
-        "Volumen Actual": "{:,.0f}",
-        "Volumen Medio (Mes)": "{:,.0f}",
+        "Volumen Actual": "{:.0f}",
+        "Volumen Medio (Mes)": "{:.0f}",
         "Volumen Relativo": "{:.2f}",
         "Soporte": "{:.2f}",
         "Resistencia": "{:.2f}",
@@ -252,18 +231,6 @@ with tab1:
         .format(formato_columnas),
         use_container_width=True
     )
-
-    df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
-
-    if not df_restantes.empty:
-        st.subheader("📊 Resto de acciones filtradas")
-
-        st.dataframe(
-            df_restantes.style
-            .applymap(color_score, subset=['Score'])
-            .format(formato_columnas),
-            use_container_width=True
-        )
 
 with tab2:
     ticker = accion_global.split(" - ")[0]
