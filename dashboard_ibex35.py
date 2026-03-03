@@ -15,7 +15,7 @@ FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
 ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7
 
-# ================== Tickers ==================
+# ================== TICKERS ==================
 ibex35_tickers = [
     "ACS.MC","ACX.MC","AENA.MC","AMS.MC","ANA.MC","BBVA.MC","BKT.MC",
     "CABK.MC","CLNX.MC","COL.MC","ENG.MC","ELE.MC","FER.MC","FDR.MC",
@@ -24,17 +24,16 @@ ibex35_tickers = [
     "SAB.MC","SAN.MC","SCYR.MC","SLR.MC","TEF.MC","UNI.MC"
 ]
 
-# ================== FUNCIONES ==================
+# ================== FUNCIÓN ANALÍTICA ==================
 def analizar_ibex35_profesional(ticker_symbol):
     try:
-        yf_ticker = ticker_symbol.replace('.', '-')
-        t = yf.Ticker(yf_ticker)
+        t = yf.Ticker(ticker_symbol)
         hist = t.history(period="15mo")
+
         if hist.empty or len(hist) < 200:
             return None
 
         nombre_accion = t.info.get('longName', ticker_symbol)
-        hist.columns = [col[0] if isinstance(col, tuple) else col for col in hist.columns]
 
         c_actual = hist['Close'].iloc[-1]
         h_5d = hist['High'].tail(5).max()
@@ -44,13 +43,15 @@ def analizar_ibex35_profesional(ticker_symbol):
         resistencia = (2 * pivot) - l_5d
         soporte = (2 * pivot) - h_5d
 
-        rsi = ta.momentum.RSIIndicator(hist['Close'], window=14).rsi().iloc[-1]
-        sma20 = ta.trend.sma_indicator(hist['Close'], window=20).iloc[-1]
-        sma50 = ta.trend.sma_indicator(hist['Close'], window=50).iloc[-1]
-        sma200 = ta.trend.sma_indicator(hist['Close'], window=200).iloc[-1]
-        atr = ta.volatility.AverageTrueRange(hist['High'], hist['Low'], hist['Close'], window=14).average_true_range().iloc[-1]
-        atr_ratio = atr / c_actual
-        volatilidad = hist['Close'].pct_change().rolling(252).std().iloc[-1] * (252**0.5)
+        rsi = ta.momentum.RSIIndicator(hist['Close'], 14).rsi().iloc[-1]
+        sma20 = hist['Close'].rolling(20).mean().iloc[-1]
+        sma50 = hist['Close'].rolling(50).mean().iloc[-1]
+        sma200 = hist['Close'].rolling(200).mean().iloc[-1]
+
+        atr = ta.volatility.AverageTrueRange(
+            hist['High'], hist['Low'], hist['Close'], 14
+        ).average_true_range().iloc[-1]
+
         vol_actual = hist['Volume'].iloc[-1]
         vol_medio_mes = hist['Volume'].tail(21).mean()
         vol_relativo = vol_actual / vol_medio_mes
@@ -70,45 +71,47 @@ def analizar_ibex35_profesional(ticker_symbol):
         else:
             señal = "SELL"
 
-        stop_loss = max(soporte, c_actual - 1.5*atr)
-        take_profit = min(resistencia, c_actual + 2*atr)
+        stop_loss = max(soporte, c_actual - 1.5 * atr)
+        take_profit = min(resistencia, c_actual + 2 * atr)
 
         return {
             "Ticker": ticker_symbol,
             "Nombre": nombre_accion,
-            "Precio": round(c_actual,2),
+            "Precio": round(c_actual, 2),
             "Score": score,
             "Señal": señal,
-            "RSI": round(rsi,2),
-            "SMA20": round(sma20,2),
-            "SMA50": round(sma50,2),
-            "SMA200": round(sma200,2),
-            "ATR": round(atr,2),
-            "ATR Ratio": round(atr_ratio,4),
-            "Volatilidad Anual": round(volatilidad,4),
-            "Volumen Actual": int(vol_actual),
-            "Volumen Medio (Mes)": int(vol_medio_mes),
-            "Volumen Relativo": round(vol_relativo,2),
-            "Soporte": round(soporte,2),
-            "Resistencia": round(resistencia,2),
-            "Stop Loss": round(stop_loss,2),
-            "Take Profit": round(take_profit,2)
+            "RSI": round(rsi, 2),
+            "SMA20": round(sma20, 2),
+            "SMA50": round(sma50, 2),
+            "SMA200": round(sma200, 2),
+            "Stop Loss": round(stop_loss, 2),
+            "Take Profit": round(take_profit, 2)
         }
 
-    except Exception as e:
-        print(f"❌ Error en {ticker_symbol}: {e}")
+    except Exception:
         return None
 
-# ================== GENERAR CSV EN MEMORIA ==================
+
+# ================== SCANNER ROBUSTO ==================
 @st.cache_data(show_spinner=True)
 def generar_scanner():
     resultados = []
+
     for tick in ibex35_tickers:
         res = analizar_ibex35_profesional(tick)
-        if res:
+        if res is not None:
             resultados.append(res)
-    df = pd.DataFrame(resultados).sort_values(by="Score", ascending=False)
+
+    if not resultados:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(resultados)
+
+    if "Score" in df.columns:
+        df = df.sort_values(by="Score", ascending=False)
+
     return df
+
 
 # ================== BOTÓN ACTUALIZAR ==================
 if st.button("🔄 Actualizar datos del Scanner"):
@@ -116,22 +119,32 @@ if st.button("🔄 Actualizar datos del Scanner"):
         df = generar_scanner()
     st.success("Datos actualizados correctamente")
 
-# ================== CARGAR DATAFRAME ==================
+# ================== CARGA INICIAL SEGURA ==================
 try:
     df
 except NameError:
-    try:
-        df = generar_scanner()
-    except Exception as e:
-        st.error(f"No se pudo generar el scanner: {e}")
-        st.stop()
+    df = generar_scanner()
+
+if df.empty:
+    st.error("El scanner no generó resultados. Posible fallo en descarga de datos.")
+    st.stop()
 
 # ================== FILTROS ==================
 st.sidebar.header("Filtros")
-score_min = st.sidebar.slider("Score mínimo", 0, 10, 4)
-score_max = st.sidebar.slider("Score máximo", 0, 10, 10)
+
+score_min, score_max = st.sidebar.slider(
+    "Rango de Score",
+    min_value=0,
+    max_value=10,
+    value=(0, 10)
+)
+
 señales = df["Señal"].unique()
-señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
+señal_filtrada = st.sidebar.multiselect(
+    "Filtrar por Señal",
+    señales,
+    default=señales
+)
 
 df_filtrado = df[
     (df["Score"] >= score_min) &
@@ -139,18 +152,27 @@ df_filtrado = df[
     (df["Señal"].isin(señal_filtrada))
 ]
 
+# ================== INFO DIAGNÓSTICO ==================
+st.write("Total acciones escaneadas:", len(df))
+st.write("Total después de filtros:", len(df_filtrado))
+
 st.dataframe(df_filtrado, use_container_width=True)
+
 if df_filtrado.empty:
+    st.warning("No hay acciones con los filtros actuales.")
     st.stop()
 
 # ================== SELECTOR ==================
-accion = st.selectbox("Selecciona una acción",
-                      df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"])
+accion = st.selectbox(
+    "Selecciona una acción",
+    df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"]
+)
+
 ticker = accion.split(" - ")[0]
-fila = df_filtrado[df_filtrado["Ticker"] == ticker].iloc[0]
 
 # ================== HISTÓRICO ==================
 hist = yf.Ticker(ticker).history(period="1y")
+
 if hist.empty:
     st.error("No se pudieron descargar datos históricos")
     st.stop()
@@ -176,63 +198,6 @@ fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA50"], name="SMA50"), row=1, co
 fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA200"], name="SMA200"), row=1, col=1)
 
 fig.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volumen"), row=2, col=1)
+
 fig.update_layout(xaxis_rangeslider_visible=False, height=800)
 st.plotly_chart(fig, use_container_width=True)
-
-# ================== FINNHUB ==================
-def obtener_earnings_futuros(ticker):
-    url = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now() + timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
-    r = requests.get(url).json()
-    return r.get("earningsCalendar", []) if isinstance(r, dict) else []
-
-def obtener_earnings_pasados(ticker):
-    url = f"https://finnhub.io/api/v1/stock/earnings?symbol={ticker}&token={FINNHUB_API_KEY}"
-    r = requests.get(url).json()
-    return r if isinstance(r, list) else []
-
-def obtener_noticias(ticker):
-    fecha_fin = datetime.now().date()
-    fecha_inicio = fecha_fin - timedelta(days=VENTANA_NOTICIAS_DIAS)
-    url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={fecha_inicio}&to={fecha_fin}&token={FINNHUB_API_KEY}"
-    r = requests.get(url).json()
-    return r if isinstance(r, list) else []
-
-future_earnings = obtener_earnings_futuros(ticker)
-past_earnings = obtener_earnings_pasados(ticker)
-noticias = obtener_noticias(ticker)
-
-# ================== PRÓXIMOS RESULTADOS ==================
-st.subheader("📅 Próximos resultados")
-if future_earnings:
-    for e in future_earnings:
-        fecha = e.get("date")
-        hora = e.get("hour", "")
-        st.write(f"📌 {fecha} {hora}")
-    fecha_resultado = pd.to_datetime(future_earnings[0].get("date"))
-    dias_restantes = (fecha_resultado.date() - datetime.now().date()).days
-    if dias_restantes <= ALERTA_DIAS:
-        st.warning(f"🚨 Resultados en {dias_restantes} días")
-else:
-    st.info("No hay próximos resultados disponibles.")
-
-# ================== RESULTADOS ANTERIORES ==================
-st.subheader("📊 Resultados anteriores")
-if past_earnings:
-    for e in past_earnings[:6]:
-        st.write(
-            f"{e.get('period')} | Actual: {e.get('actual')} | Estimado: {e.get('estimate')} | Surprise: {e.get('surprisePercent')}%"
-        )
-else:
-    st.info("No hay resultados anteriores disponibles.")
-
-# ================== NOTICIAS ==================
-st.subheader(f"📰 Noticias últimos {VENTANA_NOTICIAS_DIAS} días")
-if noticias:
-    for n in noticias:
-        fecha = datetime.fromtimestamp(n.get("datetime"))
-        st.markdown(f"**{n.get('headline')}**")
-        st.write(f"{n.get('source')} | {fecha.strftime('%d/%m/%Y')}")
-        st.write(f"[Leer noticia]({n.get('url')})")
-        st.markdown("---")
-else:
-    st.info("No hay noticias disponibles en los últimos días.")
