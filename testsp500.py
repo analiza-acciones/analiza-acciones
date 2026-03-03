@@ -201,10 +201,14 @@ def color_score(val):
     else:
         return 'background-color: #E74C3C; color: white'
 
+
+# ================== Tabs ==================
 tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
 
+# ================== TAB 1 - ACCIONES ==================
 with tab1:
     df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
+    st.subheader("📌 Acción seleccionada")
 
     formato_columnas = {
         "Precio": "{:.2f}",
@@ -232,17 +236,18 @@ with tab1:
         use_container_width=True
     )
 
-df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
+    # Resto de acciones filtradas
+    df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
+    if not df_restantes.empty:
+        st.subheader("📊 Resto de acciones filtradas")
+        st.dataframe(
+            df_restantes.style
+            .applymap(color_score, subset=['Score'])
+            .format(formato_columnas),
+            use_container_width=True
+        )
 
-if not df_restantes.empty:
-    st.subheader("📊 Resto de acciones filtradas")
-    st.dataframe(
-        df_restantes.style
-        .applymap(color_score, subset=['Score'])
-        .format(formato_columnas),
-        use_container_width=True
-    )
-    
+# ================== TAB 2 - GRÁFICO ==================
 with tab2:
     ticker = accion_global.split(" - ")[0]
     hist = yf.Ticker(ticker).history(period="1y")
@@ -268,6 +273,7 @@ with tab2:
     fig.update_layout(xaxis_rangeslider_visible=False, height=800)
     st.plotly_chart(fig, use_container_width=True)
 
+# ================== TAB 3 - RESULTADOS ==================
 with tab3:
     ticker = accion_global.split(" - ")[0]
     url_fut = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now() + timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
@@ -295,6 +301,7 @@ with tab3:
     else:
         st.info("No hay resultados anteriores disponibles.")
 
+# ================== TAB 4 - NOTICIAS ==================
 with tab4:
     ticker = accion_global.split(" - ")[0]
     fecha_fin = datetime.now().date()
