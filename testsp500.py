@@ -151,19 +151,6 @@ def analizar_SP500_profesional(ticker_symbol):
     except:
         return None
 
-
-# ================== CARGA DE DATOS ==================
-if 'df' not in st.session_state:
-    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
-    st.session_state['last_refresh'] = datetime.now()
-
-if st.button("Actualizar datos"):
-    generar_scanner.clear()
-    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
-    st.session_state['last_refresh'] = datetime.now()
-
-df = st.session_state['df']
-
 # ================== GENERAR SCANNER ==================
 @st.cache_data(show_spinner=True, ttl=3600, max_entries=3)
 def generar_scanner(cache_key):
@@ -183,6 +170,20 @@ def generar_scanner(cache_key):
         df = df.sort_values(by="Score", ascending=False)
     progress_text.text("¡Procesamiento completado!")
     return df
+    
+# ================== CARGA DE DATOS ==================
+if 'df' not in st.session_state:
+    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
+    st.session_state['last_refresh'] = datetime.now()
+
+if st.button("Actualizar datos"):
+    generar_scanner.clear()
+    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
+    st.session_state['last_refresh'] = datetime.now()
+
+df = st.session_state['df']
+
+
     
 # ================== SIDEBAR ==================
 st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%H:%M:%S')}")
