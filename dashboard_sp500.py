@@ -241,7 +241,7 @@ def color_score(val):
         return 'background-color: #E74C3C; color: white'
 
 # ================== TABS ==================
-tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias","🌍 Other"])
 
 # ================== TAB 1 ==================
 with tab1:
@@ -332,3 +332,75 @@ with tab4:
             st.markdown("---")
     else:
         st.info("No hay noticias recientes.")
+
+
+# ================== TAB 5 ==================
+with tab5:
+
+    st.subheader("🌍 Crypto & Commodities")
+
+    activos = {
+        "Bitcoin": {"ticker": "BTC-USD", "moneda": "USD"},
+        "Bitcoin €": {"ticker": "BTC-EUR", "moneda": "EUR"},
+        "Oro": {"ticker": "GC=F", "moneda": "USD"},
+        "Plata": {"ticker": "SI=F", "moneda": "USD"}
+    }
+
+    tickers = [v["ticker"] for v in activos.values()]
+
+    # Descarga en una sola llamada (más eficiente)
+    data = yf.download(tickers, period="1y", group_by="ticker", progress=False)
+
+    datos_tabla = []
+    historicos = {}
+
+    for nombre, info in activos.items():
+
+        ticker = info["ticker"]
+        moneda = info["moneda"]
+
+        if ticker in data.columns.get_level_values(0):
+
+            hist = data[ticker].dropna()
+
+            if not hist.empty:
+
+                precio_actual = hist["Close"].iloc[-1]
+
+                datos_tabla.append({
+                    "Activo": nombre,
+                    "Ticker": ticker,
+                    "Precio Actual": round(precio_actual, 2),
+                    "Moneda": moneda
+                })
+
+                historicos[nombre] = hist
+
+    df_activos = pd.DataFrame(datos_tabla)
+
+    st.subheader("📊 Precios actuales")
+    st.dataframe(df_activos, use_container_width=True)
+
+    st.subheader("📈 Histórico 1 año")
+
+    for nombre, hist in historicos.items():
+
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatter(
+                x=hist.index,
+                y=hist["Close"],
+                mode="lines",
+                name=nombre
+            )
+        )
+
+        fig.update_layout(
+            title=f"{nombre} - Histórico 1 año",
+            xaxis_title="Fecha",
+            yaxis_title="Precio",
+            height=400
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
