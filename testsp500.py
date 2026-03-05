@@ -339,7 +339,8 @@ with tab5:
     st.subheader("🌍 Crypto & Commodities")
 
     activos = {
-        "Bitcoin": "BTC-USD",
+        "Bitcoin $": "BTC-USD",
+        "Bitcoin €": "BTC-EUR",
         "Oro": "GC=F",
         "Plata": "SI=F"
     }
