@@ -391,7 +391,7 @@ with tab5:
         )
 
         fig.update_layout(
-            title=f"{nombre}",
+            title=f"{nombre} - Histórico 1 año",
             xaxis_title="Fecha",
             yaxis_title="Precio",
             height=400
