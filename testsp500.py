@@ -7,8 +7,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
 
-st.set_page_config(page_title="Dashboard SP500", layout="wide")
-st.title("📊 S&P500")
+st.set_page_config(page_title="TEST Dashboard SP500", layout="wide")
+st.title("📊 TEST S&P500")
 
 # ================== CONFIG ==================
 FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
