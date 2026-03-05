@@ -339,36 +339,41 @@ with tab5:
     st.subheader("🌍 Crypto & Commodities")
 
     activos = {
-        "Bitcoin $": "BTC-USD",
-        "Bitcoin €": "BTC-EUR",
-        "Oro": "GC=F",
-        "Plata": "SI=F"
+        "Bitcoin": {"ticker": "BTC-USD", "moneda": "USD"},
+        "Bitcoin €": {"ticker": "BTC-EUR", "moneda": "EUR"},
+        "Oro": {"ticker": "GC=F", "moneda": "USD"},
+        "Plata": {"ticker": "SI=F", "moneda": "USD"}
     }
+
+    tickers = [v["ticker"] for v in activos.values()]
+
+    # Descarga en una sola llamada (más eficiente)
+    data = yf.download(tickers, period="1y", group_by="ticker", progress=False)
 
     datos_tabla = []
     historicos = {}
 
-    for nombre, ticker in activos.items():
+    for nombre, info in activos.items():
 
-        t = yf.Ticker(ticker)
+        ticker = info["ticker"]
+        moneda = info["moneda"]
 
-        data = t.history(period="1y")
+        if ticker in data.columns.get_level_values(0):
 
-        if not data.empty:
+            hist = data[ticker].dropna()
 
-            precio_actual = data["Close"].iloc[-1]
+            if not hist.empty:
 
-            # Obtener moneda
-            moneda = t.info.get("currency", "N/A")
+                precio_actual = hist["Close"].iloc[-1]
 
-            datos_tabla.append({
-                "Activo": nombre,
-                "Ticker": ticker,
-                "Precio Actual": round(precio_actual, 2),
-                "Moneda": moneda
-            })
+                datos_tabla.append({
+                    "Activo": nombre,
+                    "Ticker": ticker,
+                    "Precio Actual": round(precio_actual, 2),
+                    "Moneda": moneda
+                })
 
-            historicos[nombre] = data
+                historicos[nombre] = hist
 
     df_activos = pd.DataFrame(datos_tabla)
 
@@ -377,14 +382,14 @@ with tab5:
 
     st.subheader("📈 Histórico 1 año")
 
-    for nombre, data in historicos.items():
+    for nombre, hist in historicos.items():
 
         fig = go.Figure()
 
         fig.add_trace(
             go.Scatter(
-                x=data.index,
-                y=data["Close"],
+                x=hist.index,
+                y=hist["Close"],
                 mode="lines",
                 name=nombre
             )
