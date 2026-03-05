@@ -341,8 +341,8 @@ with tab5:
     activos = {
         "Bitcoin $": "BTC-USD",
         "Bitcoin €": "BTC-EUR",
-        "Oro": "GC=F",
-        "Plata": "SI=F"
+        "Oro $": "GC=F",
+        "Plata $": "SI=F"
     }
 
     datos_tabla = []
