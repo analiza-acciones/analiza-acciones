@@ -241,7 +241,7 @@ def color_score(val):
         return 'background-color: #E74C3C; color: white'
 
 # ================== TABS ==================
-tab1, tab2, tab3, tab4 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias","🌍 Other"])
 
 # ================== TAB 1 ==================
 with tab1:
@@ -332,3 +332,62 @@ with tab4:
             st.markdown("---")
     else:
         st.info("No hay noticias recientes.")
+
+# ================== TAB 5 ==================
+with tab5:
+
+    st.subheader("🌍 Crypto & Commodities")
+
+    activos = {
+        "Bitcoin": "BTC-USD",
+        "Oro": "GC=F",
+        "Plata": "SI=F"
+    }
+
+    datos_tabla = []
+
+    historicos = {}
+
+    for nombre, ticker in activos.items():
+
+        data = yf.Ticker(ticker).history(period="1y")
+
+        if not data.empty:
+            precio_actual = data["Close"].iloc[-1]
+
+            datos_tabla.append({
+                "Activo": nombre,
+                "Ticker": ticker,
+                "Precio Actual": round(precio_actual,2)
+            })
+
+            historicos[nombre] = data
+
+    df_activos = pd.DataFrame(datos_tabla)
+
+    st.subheader("📊 Precios actuales")
+    st.dataframe(df_activos, use_container_width=True)
+
+    st.subheader("📈 Histórico 1 año")
+
+    for nombre, data in historicos.items():
+
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatter(
+                x=data.index,
+                y=data["Close"],
+                mode="lines",
+                name=nombre
+            )
+        )
+
+        fig.update_layout(
+            title=f"{nombre} - Histórico 1 año",
+            xaxis_title="Fecha",
+            yaxis_title="Precio",
+            height=400
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
