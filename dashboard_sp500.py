@@ -337,7 +337,7 @@ with tab4:
 # ================== TAB 5 ==================
 with tab5:
 
-    st.subheader("🌍 Crypto & Commodities")
+
 
     activos = {
         "Bitcoin": {"ticker": "BTC-USD", "moneda": "USD"},
