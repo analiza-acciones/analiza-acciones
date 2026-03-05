@@ -339,27 +339,33 @@ with tab5:
     st.subheader("🌍 Crypto & Commodities")
 
     activos = {
-        "Bitcoin $": "BTC-USD",
-        "Bitcoin €": "BTC-EUR",
-        "Oro $": "GC=F",
-        "Plata $": "SI=F"
+        "Bitcoin": "BTC-USD",
+        "Bitcoin": "BTC-EUR",
+        "Oro": "GC=F",
+        "Plata": "SI=F"
     }
 
     datos_tabla = []
-
     historicos = {}
 
     for nombre, ticker in activos.items():
 
-        data = yf.Ticker(ticker).history(period="1y")
+        t = yf.Ticker(ticker)
+
+        data = t.history(period="1y")
 
         if not data.empty:
+
             precio_actual = data["Close"].iloc[-1]
+
+            # Obtener moneda
+            moneda = t.info.get("currency", "N/A")
 
             datos_tabla.append({
                 "Activo": nombre,
                 "Ticker": ticker,
-                "Precio Actual": round(precio_actual,2)
+                "Precio Actual": round(precio_actual, 2),
+                "Moneda": moneda
             })
 
             historicos[nombre] = data
