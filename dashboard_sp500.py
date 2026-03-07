@@ -184,6 +184,12 @@ if st.button("Actualizar datos"):
 df = st.session_state['df']
 
 # ================== SIDEBAR ==================
+# Zona horaria de Madrid
+zona = pytz.timezone('Europe/Madrid')
+
+# Hora actual en Madrid
+hora_local = datetime.now(zona)
+
 st.sidebar.markdown(f"**Dia:** {datetime.now().strftime('%d/%m/%Y')}")
 st.sidebar.markdown(f"**Hora:** {datetime.now().strftime('%H:%M:%S')}")
 st.sidebar.markdown(f"**Actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
