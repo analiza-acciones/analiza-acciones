@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
-import pytz
 
 st.set_page_config(page_title="DESA Dashboard SP500", layout="wide")
 st.title("📊 DESA S&P500")
@@ -64,6 +63,7 @@ sp500_tickers = [
 "WHR","WLTW","WM","WMB","WMT","WRB","WRK","WY","WYNN","XEL",
 "XLNX","XOM","XRAY","XRX","XYL","YUM","ZBH","ZBRA","ZION","ZTS"
 ]
+
 # ================== FUNCIONES ==================
 def normalize(value, min_val, max_val):
     if value is None:
@@ -172,38 +172,111 @@ def generar_scanner(cache_key):
     return df
 
 # ================== CARGA DE DATOS ==================
-tz_madrid = pytz.timezone("Europe/Madrid")
 if 'df' not in st.session_state:
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
-    st.session_state['last_refresh'] = datetime.now(tz_madrid)
+    st.session_state['last_refresh'] = datetime.now()
 
 if st.button("Actualizar datos"):
     generar_scanner.clear()
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
-    st.session_state['last_refresh'] = datetime.now(tz_madrid)
+    st.session_state['last_refresh'] = datetime.now()
 
 df = st.session_state['df']
 
 # ================== SIDEBAR ==================
-st.sidebar.markdown(f"**Dia:** {datetime.now(tz_madrid).strftime('%d/%m/%Y')}")
-st.sidebar.markdown(f"**Hora:** {datetime.now(tz_madrid).strftime('%H:%M:%S')}")
-st.sidebar.markdown(f"**Actualización:** {st.session_state['last_refresh'].astimezone(tz_madrid).strftime('%d/%m/%Y %H:%M:%S')}")
+
+hora_mas_una = datetime.now() + timedelta(hours=1)
+st.sidebar.markdown(f"**Hora:** {hora_mas_una.strftime('%H:%M:%S')}")
+
+st.sidebar.markdown(f"**Hora:** {datetime.now().strftime('%H:%M:%S')}")
+st.sidebar.markdown(f"**Actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
 st.sidebar.header("Filtros")
 
-# ================== TAB 2 – HISTÓRICO ==================
+score_min, score_max = st.sidebar.slider(
+    "Score",
+    min_value=float(df["Score"].min()),
+    max_value=float(df["Score"].max()),
+    value=(float(df["Score"].min()), float(df["Score"].max())),
+    step=0.1
+)
+
+señales = df["Señal"].unique()
+señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
+
+df_filtrado = df[
+    (df["Score"] >= score_min) & 
+    (df["Score"] <= score_max) &
+    (df["Señal"].isin(señal_filtrada))
+]
+
+if df_filtrado.empty:
+    st.warning("No hay datos para los filtros seleccionados.")
+    st.stop()
+
+accion_global = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - " + df_filtrado["Nombre"], key="accion_global")
+
+# ================== FORMATO DE COLUMNAS ==================
+formato_columnas = {
+    "Precio": "{:.2f}",
+    "Score": "{:.1f}",
+    "RSI": "{:.2f}",
+    "SMA20": "{:.2f}",
+    "SMA50": "{:.2f}",
+    "SMA200": "{:.2f}",
+    "ATR": "{:.2f}",
+    "ATR Ratio": "{:.4f}",
+    "Volatilidad Anual": "{:.4f}",
+    "Volumen Actual": "{:.0f}",
+    "Volumen Medio (Mes)": "{:.0f}",
+    "Volumen Relativo": "{:.2f}",
+    "Soporte": "{:.2f}",
+    "Resistencia": "{:.2f}",
+    "Stop Loss": "{:.2f}",
+    "Take Profit": "{:.2f}"
+}
+
+# ================== ESTILO SCORE ==================
+def color_score(val):
+    if val >= 7:
+        return 'background-color: #2ECC71; color: white'
+    elif val >= 4:
+        return 'background-color: #F1C40F; color: black'
+    else:
+        return 'background-color: #E74C3C; color: white'
+
+# ================== TABS ==================
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias","🌍 Other"])
+
+# ================== TAB 1 ==================
+with tab1:
+    df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
+    st.subheader("📌 Acción seleccionada")
+    st.dataframe(
+        df_accion.style.applymap(color_score, subset=['Score']).format(formato_columnas),
+        use_container_width=True
+    )
+
+    df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
+    if not df_restantes.empty:
+        st.subheader("📊 Resto de acciones")
+        st.dataframe(
+            df_restantes.style.applymap(color_score, subset=['Score']).format(formato_columnas),
+            use_container_width=True
+        )
+
+# ================== TAB 2 ==================
 with tab2:
-    ticker = "AAPL"  # Ejemplo; reemplaza con tu selección dinámica
+    ticker = accion_global.split(" - ")[0]
     hist = yf.Ticker(ticker).history(period="1y")
-
-    # Convertir timestamps ya tz-aware a hora Madrid
-    hist.index = hist.index.tz_convert('Europe/Madrid')
-
     hist["SMA20"] = hist["Close"].rolling(20).mean()
     hist["SMA50"] = hist["Close"].rolling(50).mean()
     hist["SMA200"] = hist["Close"].rolling(200).mean()
+    fila = df_filtrado[df_filtrado["Ticker"] == ticker].iloc[0]
+    soporte = fila["Soporte"]
+    resistencia = fila["Resistencia"]
 
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                        vertical_spacing=0.05, row_heights=[0.7, 0.3])
     fig.add_trace(go.Candlestick(x=hist.index,
                                  open=hist["Open"], high=hist["High"],
                                  low=hist["Low"], close=hist["Close"],
@@ -211,12 +284,43 @@ with tab2:
     fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA20"], name="SMA20"), row=1, col=1)
     fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA50"], name="SMA50"), row=1, col=1)
     fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA200"], name="SMA200"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=[hist.index[0], hist.index[-1]], y=[soporte, soporte], name="Soporte", line=dict(dash='dash', color='green')), row=1, col=1)
+    fig.add_trace(go.Scatter(x=[hist.index[0], hist.index[-1]], y=[resistencia,resistencia], name="Resistencia", line=dict(dash='dash', color='red')), row=1, col=1)
+    fig.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volumen"), row=2, col=1)
     fig.update_layout(xaxis_rangeslider_visible=False, height=800)
     st.plotly_chart(fig, use_container_width=True)
 
-# ================== TAB 4 – NOTICIAS ==================
+# ================== TAB 3 ==================
+with tab3:
+    ticker = accion_global.split(" - ")[0]
+    url_fut = f"https://finnhub.io/api/v1/calendar/earnings?symbol={ticker}&from={datetime.now().date()}&to={(datetime.now() + timedelta(days=60)).date()}&token={FINNHUB_API_KEY}"
+    future_earnings = requests.get(url_fut).json().get("earningsCalendar", [])
+
+    url_pas = f"https://finnhub.io/api/v1/stock/earnings?symbol={ticker}&token={FINNHUB_API_KEY}"
+    past_earnings = requests.get(url_pas).json()
+
+    st.subheader("Próximos resultados")
+    if future_earnings:
+        for e in future_earnings:
+            fecha = e.get("date")
+            hora = e.get("hour","")
+            st.write(f"📌 {fecha} {hora}")
+            dias_restantes = (pd.to_datetime(fecha).date() - datetime.now().date()).days
+            if dias_restantes <= ALERTA_DIAS:
+                st.warning(f"🚨 Resultados en {dias_restantes} días")
+    else:
+        st.info("No hay próximos resultados disponibles.")
+
+    st.subheader("Resultados anteriores")
+    if past_earnings:
+        for e in past_earnings[:6]:
+            st.write(f"{e.get('period')} | Actual: {e.get('actual')} | Estimado: {e.get('estimate')} | Surprise: {e.get('surprisePercent')}%")
+    else:
+        st.info("No hay resultados anteriores disponibles.")
+
+# ================== TAB 4 ==================
 with tab4:
-    ticker = "AAPL"  # Ejemplo; reemplaza con tu selección dinámica
+    ticker = accion_global.split(" - ")[0]
     fecha_fin = datetime.now().date()
     fecha_inicio = fecha_fin - timedelta(days=VENTANA_NOTICIAS_DIAS)
     url_news = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={fecha_inicio}&to={fecha_fin}&token={FINNHUB_API_KEY}"
@@ -225,19 +329,19 @@ with tab4:
     st.subheader(f"Noticias últimos {VENTANA_NOTICIAS_DIAS} días")
     if noticias:
         for n in noticias[:10]:
-            # Convertir timestamp UTC a hora Madrid
-            fecha = pd.to_datetime(n.get("datetime"), unit='s', utc=True).tz_convert('Europe/Madrid')
+            fecha = datetime.fromtimestamp(n.get("datetime"))
             st.markdown(f"**{n.get('headline')}**")
-            st.write(f"{n.get('source')} | {fecha.strftime('%d/%m/%Y %H:%M:%S')}")
+            st.write(f"{n.get('source')} | {fecha.strftime('%d/%m/%Y')}")
             st.write(f"[Leer noticia]({n.get('url')})")
             st.markdown("---")
     else:
         st.info("No hay noticias recientes.")
 
+
 # ================== TAB 5 ==================
 with tab5:
 
-    st.subheader("🌍 Crypto & Commodities")
+    st.subheader("🌍 Bitcoin // Oro // Plata")
 
     activos = {
         "Bitcoin": {"ticker": "BTC-USD", "moneda": "USD"},
