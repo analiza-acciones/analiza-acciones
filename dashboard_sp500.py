@@ -184,7 +184,7 @@ if st.button("Actualizar datos"):
 df = st.session_state['df']
 
 # ================== SIDEBAR ==================
-st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%H:%M:%S')}")
+st.sidebar.markdown(f"**Hora actual:** {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 st.sidebar.markdown(f"**Última actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
 st.sidebar.header("Filtros")
 
