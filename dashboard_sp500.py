@@ -191,8 +191,8 @@ st.sidebar.markdown(f"**Dia:** {datetime.now().strftime('%d/%m/%Y')}")
 
 hora_mas_una = datetime.now() + timedelta(hours=1)
 st.sidebar.markdown(f"**Hora:** {hora_mas_una.strftime('%H:%M:%S')}")
-
-st.sidebar.markdown(f"**Actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
+st.sidebar.markdown(f"**Actualización Datos:** {hora_mas_una.strftime('%d/%m/%Y H:%M:%S')}")
+#st.sidebar.markdown(f"**Actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
 st.sidebar.header("Filtros")
 
 score_min, score_max = st.sidebar.slider(
