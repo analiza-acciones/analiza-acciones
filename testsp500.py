@@ -18,7 +18,7 @@ VENTANA_NOTICIAS_DIAS = 7
 
 # ================== Lista de tickers ==================
 sp500_tickers = [
-# (Tu lista de tickers completa va aquí)
+# Tu lista completa de tickers aquí
 "AAPL","ABBV","ABNB","ABT","ACGL","ACN","ADBE","ADI","ADM","ADP",
 # ...
 ]
@@ -131,32 +131,32 @@ def generar_scanner(cache_key):
     return df
 
 # ================== CARGA DE DATOS ==================
+tz_madrid = pytz.timezone("Europe/Madrid")
 if 'df' not in st.session_state:
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
-    st.session_state['last_refresh'] = datetime.now(pytz.timezone("Europe/Madrid"))
+    st.session_state['last_refresh'] = datetime.now(tz_madrid)
 
 if st.button("Actualizar datos"):
     generar_scanner.clear()
     st.session_state['df'] = generar_scanner("scanner_sp500_v1")
-    st.session_state['last_refresh'] = datetime.now(pytz.timezone("Europe/Madrid"))
+    st.session_state['last_refresh'] = datetime.now(tz_madrid)
 
 df = st.session_state['df']
 
 # ================== SIDEBAR ==================
-tz_madrid = pytz.timezone("Europe/Madrid")
 st.sidebar.markdown(f"**Dia:** {datetime.now(tz_madrid).strftime('%d/%m/%Y')}")
 st.sidebar.markdown(f"**Hora:** {datetime.now(tz_madrid).strftime('%H:%M:%S')}")
-st.sidebar.markdown(f"**Actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
+st.sidebar.markdown(f"**Actualización:** {st.session_state['last_refresh'].astimezone(tz_madrid).strftime('%d/%m/%Y %H:%M:%S')}")
 st.sidebar.header("Filtros")
 
 # ================== TAB 2 – HISTÓRICO ==================
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Resultados","📰 Noticias","🌍 Other"])
 with tab2:
-    ticker = "AAPL"  # Ejemplo; usa tu ticker seleccionado
+    ticker = "AAPL"  # Ejemplo; reemplaza con tu selección dinámica
     hist = yf.Ticker(ticker).history(period="1y")
 
-    # Convertir a hora Madrid
-    hist.index = hist.index.tz_localize('UTC').tz_convert('Europe/Madrid')
+    # Convertir timestamps ya tz-aware a hora Madrid
+    hist.index = hist.index.tz_convert('Europe/Madrid')
 
     hist["SMA20"] = hist["Close"].rolling(20).mean()
     hist["SMA50"] = hist["Close"].rolling(50).mean()
@@ -175,7 +175,7 @@ with tab2:
 
 # ================== TAB 4 – NOTICIAS ==================
 with tab4:
-    ticker = "AAPL"  # Ejemplo
+    ticker = "AAPL"  # Ejemplo; reemplaza con tu selección dinámica
     fecha_fin = datetime.now().date()
     fecha_inicio = fecha_fin - timedelta(days=VENTANA_NOTICIAS_DIAS)
     url_news = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={fecha_inicio}&to={fecha_fin}&token={FINNHUB_API_KEY}"
@@ -184,7 +184,7 @@ with tab4:
     st.subheader(f"Noticias últimos {VENTANA_NOTICIAS_DIAS} días")
     if noticias:
         for n in noticias[:10]:
-            # Convertir timestamp a hora Madrid
+            # Convertir timestamp UTC a hora Madrid
             fecha = pd.to_datetime(n.get("datetime"), unit='s', utc=True).tz_convert('Europe/Madrid')
             st.markdown(f"**{n.get('headline')}**")
             st.write(f"{n.get('source')} | {fecha.strftime('%d/%m/%Y %H:%M:%S')}")
@@ -192,6 +192,7 @@ with tab4:
             st.markdown("---")
     else:
         st.info("No hay noticias recientes.")
+
 # ================== TAB 5 ==================
 with tab5:
 
