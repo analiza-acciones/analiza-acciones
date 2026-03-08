@@ -178,7 +178,7 @@ if 'df' not in st.session_state:
 
 if st.button("Actualizar datos"):
     generar_scanner.clear()
-    #st.session_state['df'] = generar_scanner("scanner_sp500_v1")
+    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
     st.session_state['last_refresh'] = datetime.now()
 
 df = st.session_state['df']
