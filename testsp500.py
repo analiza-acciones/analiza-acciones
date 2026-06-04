@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
+import numpy as np
 
 st.set_page_config(page_title="Dashboard SP500", layout="wide")
 st.title("📊 TESTS&P500")
@@ -66,9 +67,19 @@ sp500_tickers = [
 
 # ================== FUNCIONES ==================
 def normalize(value, min_val, max_val):
-    if value is None:
+    if value is None or np.isnan(float(value if value is not None else 0)):
         return 0.5
-    return max(0, min(1, (value - min_val)/(max_val - min_val)))
+    return max(0.0, min(1.0, (float(value) - min_val) / (max_val - min_val)))
+
+def safe(value, default=None):
+    """Devuelve None si el valor es NaN o None."""
+    if value is None:
+        return default
+    try:
+        f = float(value)
+        return default if np.isnan(f) else f
+    except (TypeError, ValueError):
+        return default
 
 def analizar_SP500_profesional(ticker_symbol):
     try:
@@ -82,73 +93,211 @@ def analizar_SP500_profesional(ticker_symbol):
         hist.columns = [col[0] if isinstance(col, tuple) else col for col in hist.columns]
 
         c_actual = hist['Close'].iloc[-1]
+
+        # ── Soporte/Resistencia (pivot points 5 días) ──────────────────────────
         h_5d = hist['High'].tail(5).max()
         l_5d = hist['Low'].tail(5).min()
         pivot = (h_5d + l_5d + c_actual) / 3
         resistencia = (2 * pivot) - l_5d
         soporte = (2 * pivot) - h_5d
 
-        rsi = ta.momentum.RSIIndicator(hist['Close'], window=14).rsi().iloc[-1]
-        sma20 = ta.trend.sma_indicator(hist['Close'], window=20).iloc[-1]
-        sma50 = ta.trend.sma_indicator(hist['Close'], window=50).iloc[-1]
-        sma200 = ta.trend.sma_indicator(hist['Close'], window=200).iloc[-1]
-        atr = ta.volatility.AverageTrueRange(hist['High'], hist['Low'], hist['Close'], window=14).average_true_range().iloc[-1]
+        # ── Indicadores técnicos ────────────────────────────────────────────────
+        close = hist['Close']
+        high  = hist['High']
+        low   = hist['Low']
+
+        rsi = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
+
+        sma20  = ta.trend.sma_indicator(close, window=20).iloc[-1]
+        sma50  = ta.trend.sma_indicator(close, window=50).iloc[-1]
+        sma200 = ta.trend.sma_indicator(close, window=200).iloc[-1]
+
+        # Pendiente normalizada de SMAs (positiva = tendencia alcista)
+        sma20_slope  = (ta.trend.sma_indicator(close, window=20).iloc[-1]  - ta.trend.sma_indicator(close, window=20).iloc[-6])  / c_actual
+        sma50_slope  = (ta.trend.sma_indicator(close, window=50).iloc[-1]  - ta.trend.sma_indicator(close, window=50).iloc[-11]) / c_actual
+        sma200_slope = (ta.trend.sma_indicator(close, window=200).iloc[-1] - ta.trend.sma_indicator(close, window=200).iloc[-21]) / c_actual
+
+        # MACD
+        macd_obj   = ta.trend.MACD(close)
+        macd_line  = macd_obj.macd().iloc[-1]
+        macd_signal= macd_obj.macd_signal().iloc[-1]
+        macd_hist  = macd_obj.macd_diff().iloc[-1]   # histograma = MACD - Signal
+        # Cambio del histograma respecto a la barra anterior (momentum del MACD)
+        macd_hist_prev = macd_obj.macd_diff().iloc[-2]
+        macd_aceleracion = macd_hist - macd_hist_prev
+
+        # Bollinger Bands
+        bb = ta.volatility.BollingerBands(close, window=20, window_dev=2)
+        bb_upper = bb.bollinger_hband().iloc[-1]
+        bb_lower = bb.bollinger_lband().iloc[-1]
+        bb_mid   = bb.bollinger_mavg().iloc[-1]
+        bb_width = (bb_upper - bb_lower) / bb_mid      # volatilidad relativa
+        bb_pos   = (c_actual - bb_lower) / (bb_upper - bb_lower) if (bb_upper - bb_lower) > 0 else 0.5
+
+        # ATR
+        atr = ta.volatility.AverageTrueRange(high, low, close, window=14).average_true_range().iloc[-1]
         atr_ratio = atr / c_actual
-        volatilidad = hist['Close'].pct_change().rolling(252).std().iloc[-1] * (252**0.5)
-        vol_actual = hist['Volume'].iloc[-1]
+
+        # Volatilidad histórica anualizada
+        volatilidad = close.pct_change().rolling(252).std().iloc[-1] * (252 ** 0.5)
+
+        # Volumen
+        vol_actual   = hist['Volume'].iloc[-1]
         vol_medio_mes = hist['Volume'].tail(21).mean()
-        vol_relativo = vol_actual / vol_medio_mes
+        vol_relativo = vol_actual / vol_medio_mes if vol_medio_mes > 0 else 1.0
 
-        per = t.info.get('trailingPE', None)
-        roe = t.info.get('returnOnEquity', None)
-        deuda_equity = t.info.get('debtToEquity', None)
-        crecimiento_ingresos = t.info.get('revenueGrowth', None)
-        beta = t.info.get('beta', None)
+        # Momentum de precio (retornos a 1m, 3m, 6m)
+        ret_1m  = (c_actual / close.iloc[-22]  - 1) if len(close) >= 22  else 0
+        ret_3m  = (c_actual / close.iloc[-66]  - 1) if len(close) >= 66  else 0
+        ret_6m  = (c_actual / close.iloc[-126] - 1) if len(close) >= 126 else 0
+        momentum = ret_1m * 0.5 + ret_3m * 0.3 + ret_6m * 0.2   # ponderado por recencia
 
-        score_per = 1 - normalize(per, 5, 50)
-        score_roe = normalize(roe, 0, 0.3)
-        score_deuda = 1 - normalize(deuda_equity, 0, 2)
-        score_crec = normalize(crecimiento_ingresos, 0, 0.3)
-        score_fund = (score_per*0.25 + score_roe*0.25 + score_deuda*0.25 + score_crec*0.25)
+        # ── Fundamentales ──────────────────────────────────────────────────────
+        per                = safe(t.info.get('trailingPE'))
+        roe                = safe(t.info.get('returnOnEquity'))
+        deuda_equity       = safe(t.info.get('debtToEquity'))
+        crecimiento_ingresos = safe(t.info.get('revenueGrowth'))
+        beta               = safe(t.info.get('beta'))
+        margen_neto        = safe(t.info.get('profitMargins'))
+        fcf_yield          = safe(t.info.get('freeCashflow'))
+        market_cap         = safe(t.info.get('marketCap'))
+        fcf_yield_ratio    = (fcf_yield / market_cap) if (fcf_yield and market_cap and market_cap > 0) else None
 
-        score_rsi = 1 - normalize(rsi, 30, 70)
-        score_sma = sum([1 if c_actual > sma else 0 for sma in [sma20, sma50, sma200]]) / 3
-        score_tec = (score_rsi*0.5 + score_sma*0.5)
+        # ── SCORE FUNDAMENTAL (mejorado) ───────────────────────────────────────
+        # PER: rango sectorial aproximado; penaliza extremos altos pero no premia demasiado bajo
+        # Usamos rango 8-35 como "razonable"
+        score_per  = 1 - normalize(per, 8, 40)           if per  is not None else 0.5
+        score_roe  = normalize(roe, 0.05, 0.35)           if roe  is not None else 0.5
+        score_deuda = 1 - normalize(deuda_equity, 0, 150) if deuda_equity is not None else 0.5  # D/E en % (yfinance)
+        score_crec = normalize(crecimiento_ingresos, -0.05, 0.25) if crecimiento_ingresos is not None else 0.5
+        score_margen = normalize(margen_neto, 0.0, 0.30)  if margen_neto is not None else 0.5
+        score_fcf  = normalize(fcf_yield_ratio, 0.01, 0.08) if fcf_yield_ratio is not None else 0.5
 
-        score_vol = 1 - normalize(atr_ratio, 0.01, 0.1)
-        score_beta = 1 - normalize(beta, 0.5, 2)
-        score_riesgo = (score_vol*0.5 + score_beta*0.5)
+        score_fund = (
+            score_per    * 0.20 +
+            score_roe    * 0.20 +
+            score_deuda  * 0.15 +
+            score_crec   * 0.15 +
+            score_margen * 0.15 +
+            score_fcf    * 0.15
+        )
 
-        score_final = score_fund*0.5 + score_tec*0.3 + score_riesgo*0.2
-        score_final_10 = round(score_final*10,1)
+        # ── SCORE TÉCNICO (mejorado) ───────────────────────────────────────────
+        # RSI: zona óptima de entrada ≈ 40-60 (no sobrecomprado, no sobrevendido)
+        # En tendencia alcista, RSI 50-65 es fuerte. Penalizamos <30 (pánico) y >75 (euforia).
+        if rsi < 30:
+            score_rsi = 0.2   # sobreventa extrema → riesgo
+        elif rsi < 45:
+            score_rsi = 0.5 + (rsi - 30) / 15 * 0.3   # recuperación
+        elif rsi <= 65:
+            score_rsi = 0.8   # zona sana
+        elif rsi <= 75:
+            score_rsi = 0.8 - (rsi - 65) / 10 * 0.4   # sobrecompra moderada
+        else:
+            score_rsi = 0.2   # sobrecompra extrema
+
+        # SMA: precio vs medias + pendiente (dirección de la tendencia)
+        pos_sma20  = 1 if c_actual > sma20  else 0
+        pos_sma50  = 1 if c_actual > sma50  else 0
+        pos_sma200 = 1 if c_actual > sma200 else 0
+        slope_sma20  = 1 if sma20_slope  > 0 else 0
+        slope_sma50  = 1 if sma50_slope  > 0 else 0
+        slope_sma200 = 1 if sma200_slope > 0 else 0
+        # Golden cross: SMA50 > SMA200
+        golden_cross = 1 if sma50 > sma200 else 0
+        score_sma = (pos_sma20*0.15 + pos_sma50*0.15 + pos_sma200*0.20 +
+                     slope_sma20*0.10 + slope_sma50*0.10 + slope_sma200*0.10 +
+                     golden_cross*0.20)
+
+        # MACD: señal de cruce y aceleración del histograma
+        macd_bullish = 1 if macd_line > macd_signal else 0          # MACD sobre señal
+        macd_accel   = 1 if macd_aceleracion > 0 else 0              # histograma creciendo
+        score_macd   = macd_bullish * 0.6 + macd_accel * 0.4
+
+        # Bollinger: preferimos precio cerca de la media (no en extremos)
+        # bb_pos=0 → en banda inferior (sobreventa), bb_pos=1 → banda superior (sobrecompra)
+        # Óptimo: 0.35-0.65
+        score_bb = 1 - abs(bb_pos - 0.5) * 2   # máximo en 0.5, mínimo en extremos
+
+        # Momentum de precio: preferimos tendencias positivas moderadas
+        score_momentum = normalize(momentum, -0.10, 0.25)
+
+        # Volumen relativo: volumen alto en subida es señal positiva (confirmación)
+        if vol_relativo > 1.5 and ret_1m > 0:
+            score_vol_tec = 0.9   # volumen alto con subida = muy positivo
+        elif vol_relativo > 1.0:
+            score_vol_tec = 0.6   # volumen normal-alto
+        elif vol_relativo > 0.5:
+            score_vol_tec = 0.4
+        else:
+            score_vol_tec = 0.2   # volumen muy bajo = poca convicción
+
+        score_tec = (
+            score_rsi      * 0.20 +
+            score_sma      * 0.25 +
+            score_macd     * 0.20 +
+            score_bb       * 0.10 +
+            score_momentum * 0.15 +
+            score_vol_tec  * 0.10
+        )
+
+        # ── SCORE DE RIESGO (mejorado) ─────────────────────────────────────────
+        score_atr  = 1 - normalize(atr_ratio, 0.005, 0.06)   # ATR/precio ajustado
+        score_beta = 1 - normalize(beta, 0.3, 2.0) if beta is not None else 0.5
+        score_vol_anual = 1 - normalize(volatilidad, 0.10, 0.60)
+
+        score_riesgo = (
+            score_atr      * 0.35 +
+            score_beta     * 0.35 +
+            score_vol_anual * 0.30
+        )
+
+        # ── SCORE FINAL ───────────────────────────────────────────────────────
+        score_final = score_fund * 0.40 + score_tec * 0.40 + score_riesgo * 0.20
+        score_final_10 = round(score_final * 10, 1)
 
         señal = "BUY" if score_final_10 >= 7 else "HOLD" if score_final_10 >= 4 else "SELL"
 
-        stop_loss = max(soporte, c_actual - 1.5*atr)
-        take_profit = min(resistencia, c_actual + 2*atr)
+        # ── Stop Loss / Take Profit dinámicos ──────────────────────────────────
+        # Ajustamos el multiplicador según el score de riesgo: menor riesgo → SL más ajustado
+        riesgo_mult = 1.0 + (1 - score_riesgo) * 1.0   # rango ~1.0 - 2.0
+        stop_loss   = max(soporte, c_actual - riesgo_mult * 1.5 * atr)
+        take_profit = min(resistencia, c_actual + riesgo_mult * 2.5 * atr)
 
         return {
             "Ticker": ticker_symbol,
             "Nombre": nombre_accion,
-            "Precio": round(c_actual,2),
+            "Precio": round(c_actual, 2),
             "Score": score_final_10,
             "Señal": señal,
-            "RSI": round(rsi,2),
-            "SMA20": round(sma20,2),
-            "SMA50": round(sma50,2),
-            "SMA200": round(sma200,2),
-            "ATR": round(atr,2),
-            "ATR Ratio": round(atr_ratio,4),
-            "Volatilidad Anual": round(volatilidad,4),
+            "RSI": round(rsi, 2),
+            "MACD": round(macd_line, 4),
+            "MACD_Signal": round(macd_signal, 4),
+            "MACD_Hist": round(macd_hist, 4),
+            "BB_Pos": round(bb_pos, 3),
+            "Momentum_1M": round(ret_1m * 100, 2),
+            "Momentum_3M": round(ret_3m * 100, 2),
+            "Momentum_6M": round(ret_6m * 100, 2),
+            "SMA20": round(sma20, 2),
+            "SMA50": round(sma50, 2),
+            "SMA200": round(sma200, 2),
+            "Golden_Cross": "✅" if sma50 > sma200 else "❌",
+            "ATR": round(atr, 2),
+            "ATR Ratio": round(atr_ratio, 4),
+            "Volatilidad Anual": round(volatilidad, 4),
             "Volumen Actual": int(vol_actual),
             "Volumen Medio (Mes)": int(vol_medio_mes),
-            "Volumen Relativo": round(vol_relativo,2),
-            "Soporte": round(soporte,2),
-            "Resistencia": round(resistencia,2),
-            "Stop Loss": round(stop_loss,2),
-            "Take Profit": round(take_profit,2)
+            "Volumen Relativo": round(vol_relativo, 2),
+            "Soporte": round(soporte, 2),
+            "Resistencia": round(resistencia, 2),
+            "Stop Loss": round(stop_loss, 2),
+            "Take Profit": round(take_profit, 2),
+            # Sub-scores para transparencia
+            "Score_Fund": round(score_fund * 10, 1),
+            "Score_Tec": round(score_tec * 10, 1),
+            "Score_Riesgo": round(score_riesgo * 10, 1),
         }
-    except:
+    except Exception:
         return None
 
 # ================== GENERAR SCANNER ==================
@@ -173,26 +322,22 @@ def generar_scanner(cache_key):
 
 # ================== CARGA DE DATOS ==================
 if 'df' not in st.session_state:
-    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
+    st.session_state['df'] = generar_scanner("scanner_sp500_v2")
     st.session_state['last_refresh'] = datetime.now()
 
 if st.button("Actualizar datos"):
     generar_scanner.clear()
-    st.session_state['df'] = generar_scanner("scanner_sp500_v1")
+    st.session_state['df'] = generar_scanner("scanner_sp500_v2")
     st.session_state['last_refresh'] = datetime.now()
 
 df = st.session_state['df']
 
 # ================== SIDEBAR ==================
-
-
-
 st.sidebar.markdown(f"**Dia:** {datetime.now().strftime('%d/%m/%Y')}")
 
 hora_mas_una = datetime.now() + timedelta(hours=1)
 st.sidebar.markdown(f"**Hora:** {hora_mas_una.strftime('%H:%M:%S')}")
 st.sidebar.markdown(f"**Ultima Actualización Datos:** {hora_mas_una.strftime('%d/%m/%Y %H:%M:%S')}")
-#st.sidebar.markdown(f"**Actualización:** {st.session_state['last_refresh'].strftime('%d/%m/%Y %H:%M:%S')}")
 st.sidebar.header("Filtros")
 
 score_min, score_max = st.sidebar.slider(
@@ -207,7 +352,7 @@ señales = df["Señal"].unique()
 señal_filtrada = st.sidebar.multiselect("Filtrar por Señal", señales, default=señales)
 
 df_filtrado = df[
-    (df["Score"] >= score_min) & 
+    (df["Score"] >= score_min) &
     (df["Score"] <= score_max) &
     (df["Señal"].isin(señal_filtrada))
 ]
@@ -222,7 +367,17 @@ accion_global = st.selectbox("Selecciona acción", df_filtrado["Ticker"] + " - "
 formato_columnas = {
     "Precio": "{:.2f}",
     "Score": "{:.1f}",
+    "Score_Fund": "{:.1f}",
+    "Score_Tec": "{:.1f}",
+    "Score_Riesgo": "{:.1f}",
     "RSI": "{:.2f}",
+    "MACD": "{:.4f}",
+    "MACD_Signal": "{:.4f}",
+    "MACD_Hist": "{:.4f}",
+    "BB_Pos": "{:.3f}",
+    "Momentum_1M": "{:.2f}%",
+    "Momentum_3M": "{:.2f}%",
+    "Momentum_6M": "{:.2f}%",
     "SMA20": "{:.2f}",
     "SMA50": "{:.2f}",
     "SMA200": "{:.2f}",
@@ -252,18 +407,28 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Acciones","📈 Gráfico","📊 Re
 
 # ================== TAB 1 ==================
 with tab1:
-    df_accion = df_filtrado[df_filtrado["Ticker"] == accion_global.split(" - ")[0]]
+    ticker_sel = accion_global.split(" - ")[0]
+    df_accion = df_filtrado[df_filtrado["Ticker"] == ticker_sel]
     st.subheader("📌 Acción seleccionada")
+    # Columnas principales
+    cols_principales = ["Ticker","Nombre","Precio","Score","Señal","Score_Fund","Score_Tec","Score_Riesgo",
+                        "RSI","MACD_Hist","BB_Pos","Golden_Cross",
+                        "Momentum_1M","Momentum_3M","Momentum_6M",
+                        "Volumen Relativo","Soporte","Resistencia","Stop Loss","Take Profit"]
     st.dataframe(
-        df_accion.style.applymap(color_score, subset=['Score']).format(formato_columnas),
+        df_accion[cols_principales].style.applymap(color_score, subset=['Score','Score_Fund','Score_Tec','Score_Riesgo']).format(
+            {k:v for k,v in formato_columnas.items() if k in cols_principales}
+        ),
         use_container_width=True
     )
 
-    df_restantes = df_filtrado[df_filtrado["Ticker"] != accion_global.split(" - ")[0]]
+    df_restantes = df_filtrado[df_filtrado["Ticker"] != ticker_sel]
     if not df_restantes.empty:
         st.subheader("📊 Resto de acciones")
         st.dataframe(
-            df_restantes.style.applymap(color_score, subset=['Score']).format(formato_columnas),
+            df_restantes[cols_principales].style.applymap(color_score, subset=['Score','Score_Fund','Score_Tec','Score_Riesgo']).format(
+                {k:v for k,v in formato_columnas.items() if k in cols_principales}
+            ),
             use_container_width=True
         )
 
@@ -271,26 +436,54 @@ with tab1:
 with tab2:
     ticker = accion_global.split(" - ")[0]
     hist = yf.Ticker(ticker).history(period="1y")
-    hist["SMA20"] = hist["Close"].rolling(20).mean()
-    hist["SMA50"] = hist["Close"].rolling(50).mean()
+    hist["SMA20"]  = hist["Close"].rolling(20).mean()
+    hist["SMA50"]  = hist["Close"].rolling(50).mean()
     hist["SMA200"] = hist["Close"].rolling(200).mean()
-    fila = df_filtrado[df_filtrado["Ticker"] == ticker].iloc[0]
-    soporte = fila["Soporte"]
-    resistencia = fila["Resistencia"]
 
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                        vertical_spacing=0.05, row_heights=[0.7, 0.3])
+    # MACD para el gráfico
+    macd_obj_g   = ta.trend.MACD(hist["Close"])
+    hist["MACD"]       = macd_obj_g.macd()
+    hist["MACD_Signal"]= macd_obj_g.macd_signal()
+    hist["MACD_Hist"]  = macd_obj_g.macd_diff()
+
+    fila = df_filtrado[df_filtrado["Ticker"] == ticker].iloc[0]
+    soporte    = fila["Soporte"]
+    resistencia= fila["Resistencia"]
+
+    fig = make_subplots(
+        rows=3, cols=1, shared_xaxes=True,
+        vertical_spacing=0.04,
+        row_heights=[0.55, 0.20, 0.25],
+        subplot_titles=("Precio", "Volumen", "MACD")
+    )
+
+    # Velas
     fig.add_trace(go.Candlestick(x=hist.index,
-                                 open=hist["Open"], high=hist["High"],
-                                 low=hist["Low"], close=hist["Close"],
-                                 name="Precio"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA20"], name="SMA20"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA50"], name="SMA50"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=hist.index, y=hist["SMA200"], name="SMA200"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=[hist.index[0], hist.index[-1]], y=[soporte, soporte], name="Soporte", line=dict(dash='dash', color='green')), row=1, col=1)
-    fig.add_trace(go.Scatter(x=[hist.index[0], hist.index[-1]], y=[resistencia,resistencia], name="Resistencia", line=dict(dash='dash', color='red')), row=1, col=1)
-    fig.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volumen"), row=2, col=1)
-    fig.update_layout(xaxis_rangeslider_visible=False, height=800)
+        open=hist["Open"], high=hist["High"], low=hist["Low"], close=hist["Close"],
+        name="Precio"), row=1, col=1)
+    for sma, color, name in [(hist["SMA20"],"#F1C40F","SMA20"),(hist["SMA50"],"#3498DB","SMA50"),(hist["SMA200"],"#E74C3C","SMA200")]:
+        fig.add_trace(go.Scatter(x=hist.index, y=sma, name=name, line=dict(color=color, width=1.2)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=[hist.index[0], hist.index[-1]], y=[soporte, soporte],
+        name="Soporte", line=dict(dash='dash', color='green', width=1)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=[hist.index[0], hist.index[-1]], y=[resistencia, resistencia],
+        name="Resistencia", line=dict(dash='dash', color='red', width=1)), row=1, col=1)
+
+    # Volumen coloreado (verde si sube, rojo si baja)
+    colors_vol = ['#2ECC71' if c >= o else '#E74C3C'
+                  for c, o in zip(hist['Close'], hist['Open'])]
+    fig.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volumen",
+        marker_color=colors_vol, opacity=0.7), row=2, col=1)
+
+    # MACD
+    colors_hist = ['#2ECC71' if v >= 0 else '#E74C3C' for v in hist["MACD_Hist"].fillna(0)]
+    fig.add_trace(go.Bar(x=hist.index, y=hist["MACD_Hist"], name="MACD Hist",
+        marker_color=colors_hist, opacity=0.7), row=3, col=1)
+    fig.add_trace(go.Scatter(x=hist.index, y=hist["MACD"], name="MACD",
+        line=dict(color="#3498DB", width=1.2)), row=3, col=1)
+    fig.add_trace(go.Scatter(x=hist.index, y=hist["MACD_Signal"], name="Signal",
+        line=dict(color="#F1C40F", width=1.2)), row=3, col=1)
+
+    fig.update_layout(xaxis_rangeslider_visible=False, height=850, showlegend=True)
     st.plotly_chart(fig, use_container_width=True)
 
 # ================== TAB 3 ==================
@@ -340,74 +533,46 @@ with tab4:
     else:
         st.info("No hay noticias recientes.")
 
-
 # ================== TAB 5 ==================
 with tab5:
-
     st.subheader("🌍 Bitcoin // Oro // Plata")
 
     activos = {
-        "Bitcoin": {"ticker": "BTC-USD", "moneda": "USD"},
-        "Bitcoin €": {"ticker": "BTC-EUR", "moneda": "EUR"},
-        "Oro": {"ticker": "GC=F", "moneda": "USD"},
-        "Plata": {"ticker": "SI=F", "moneda": "USD"}
+        "Bitcoin":    {"ticker": "BTC-USD", "moneda": "USD"},
+        "Bitcoin €":  {"ticker": "BTC-EUR", "moneda": "EUR"},
+        "Oro":        {"ticker": "GC=F",    "moneda": "USD"},
+        "Plata":      {"ticker": "SI=F",    "moneda": "USD"}
     }
 
     tickers = [v["ticker"] for v in activos.values()]
-
-    # Descarga en una sola llamada (más eficiente)
     data = yf.download(tickers, period="1y", group_by="ticker", progress=False)
 
     datos_tabla = []
-    historicos = {}
+    historicos  = {}
 
     for nombre, info in activos.items():
-
-        ticker = info["ticker"]
-        moneda = info["moneda"]
-
+        ticker  = info["ticker"]
+        moneda  = info["moneda"]
         if ticker in data.columns.get_level_values(0):
-
             hist = data[ticker].dropna()
-
             if not hist.empty:
-
                 precio_actual = hist["Close"].iloc[-1]
-
                 datos_tabla.append({
                     "Activo": nombre,
                     "Ticker": ticker,
                     "Precio Actual": round(precio_actual, 2),
                     "Moneda": moneda
                 })
-
                 historicos[nombre] = hist
 
     df_activos = pd.DataFrame(datos_tabla)
-
     st.subheader("📊 Precios actuales")
     st.dataframe(df_activos, use_container_width=True)
 
     st.subheader("📈 Histórico 1 año")
-
     for nombre, hist in historicos.items():
-
         fig = go.Figure()
-
-        fig.add_trace(
-            go.Scatter(
-                x=hist.index,
-                y=hist["Close"],
-                mode="lines",
-                name=nombre
-            )
-        )
-
-        fig.update_layout(
-            title=f"{nombre} - Histórico 1 año",
-            xaxis_title="Fecha",
-            yaxis_title="Precio",
-            height=400
-        )
-
+        fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode="lines", name=nombre))
+        fig.update_layout(title=f"{nombre} - Histórico 1 año",
+                          xaxis_title="Fecha", yaxis_title="Precio", height=400)
         st.plotly_chart(fig, use_container_width=True)
