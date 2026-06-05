@@ -16,54 +16,34 @@ FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
 ALERTA_DIAS = 7
 VENTANA_NOTICIAS_DIAS = 7
 
-# ================== Lista de tickers ==================
-sp500_tickers = [
-"AAPL","ABBV","ABNB","ABT","ACGL","ACN","ADBE","ADI","ADM","ADP",
-"ADSK","AEE","AEP","AES","AFL","AIG","AIZ","AJG","AKAM","ALB",
-"ALGN","ALLE","ALL","AMAT","AMD","AME","AMGN","AMP","AMT",
-"AMZN","ANET","ANSS","AON","APA","APD","APH","APTV","ARE","ATO",
-"AVB","AVGO","AVY","AXP","AZO","BA","BAC","BALL","BAX","BBWI",
-"BBY","BDX","BEN","BF.B","BG","BIIB","BK","BKNG","BKR","BLK",
-"BMY","BR","BRK.B","BSX","BWA","C","CAG","CAH","CARR","CAT",
-"CB","CBRE","CCI","CCL","CDNS","CEG","CERN","CF","CFG","CHD",
-"CHRW","CHTR","CI","CINF","CL","CLX","CMA","CMCSA","CME","CMG",
-"COF","COG","COO","COP","COST","CPB","CPRT","CRM","CSCO","CSX",
-"CTAS","CTL","CTSH","CTVA","CVS","CVX","CZR","DD","DE","DFS",
-"DG","DGX","DHI","DHR","DIS","DISCA","DISCK","DOW","DOX","DPZ",
-"DRE","DRI","DTE","DUK","DVA","DVN","DXC","EA","EBAY","ECL",
-"ED","EFX","EIX","EL","EME","EMN","EMR","ENPH","EOG","EQIX","EQT",
-"ESS","ETN","ETR","EVRG","EW","EXC","EXPD","EXPE","F","FAST",
-"FBHS","FCX","FDX","FE","FIS","FISV","FITB","FL","FLS","FLT",
-"FMC","FOXA","FOX","FPH","FRC","FRT","FTI","FTNT","FTV","GD",
-"GE","GILD","GIS","GL","GLW","GM","GOOG","GOOGL","GPC","GPN",
-"GPS","GRMN","GS","GT","GWW","HAL","HAS","HBAN","HCA","HCP",
-"HD","HES","HIG","HII","HLT","HOG","HOLX","HON","HPQ","HRL",
-"HSIC","HST","HSY","HTZ","HUM","IBM","ICE","IFF","ILMN","INCY",
-"INFO","INTC","INTU","IP","IPG","IQV","IR","IRM","ISRG","IT",
-"ITW","IVZ","J","JBHT","JCI","JKHY","JNJ","JPM","JWN","K",
-"KEY","KEYS","KHC","KIM","KMI","KLAC","KMX","KO","KR","KSU",
-"L","LAD","LB","LDOS","LDL","LEG","LEN","LH","LHX","LIN",
-"LKQ","LLY","LMT","LNC","LNT","LOW","LRCX","LUV","LYB","M",
-"MA","MCD","MCHP","MCK","MCO","MDLZ","MDT","MET","MGM","MHK",
-"MKC","MKTX","MLM","MMC","MMM","MNST","MO","MOS","MPC","MRK",
-"MRO","MS","MSFT","MSI","MTB","MTD","MU","NFLX","NI","NKE",
-"NLOK","NOV","NRG","NSC","NTAP","NTRS","NUE","NVDA","NVR","NWL",
-"NWS","NWSA","NXPI","O","ODFL","OGN","OKE","OMC","ORCL","ORLY",
-"OTIS","OXY","PAYC","PAYX","PBCT","PCAR","PCG","PFG","PG","PGR",
-"PH","PHM","PKG","PKI","PLD","PM","PNC","PNR","PNW","PPG",
-"PPL","PRGO","PRU","PSA","PSX","PVH","PWR","PXD","PYPL","QCOM",
-"QRVO","RCL","RE","REG","REGN","RF","RHI","RJF","RL","RMD",
-"ROK","ROL","ROP","ROST","RSG","RTX","SBAC","SBUX","SCHW","SEE",
-"SHW","SIVB","SJM","SLB","SNA","SNPS","SO","SPG","SPGI","SRE",
-"STE","STT","STZ","SWK","SWKS","SYF","SYK","SYY","T","TAK",
-"TBH","TDG","TEL","TER","TFC","TGT","TIF","TJX","TMO","TMUS",
-"TPR","TRGP","TRV","TSCO","TSLA","TSN","TT","TUB","TWTR","TXN",
-"TXT","TZOO","UAL","UDR","UHS","ULTA","UNH","UNM","UNP","UPS",
-"URI","USB","V","VAR","VFC","VLO","VMC","VNO","VRTX","VTR",
-"VZ","WAB","WAT","WBA","WB","WDC","WEC","WELL","WFC","WFT",
-"WHR","WLTW","WM","WMB","WMT","WRB","WRK","WY","WYNN","XEL",
-"XLNX","XOM","XRAY","XRX","XYL","YUM","ZBH","ZBRA","ZION","ZTS"
-]
+# ================== Lista de tickers (actualizada dinámicamente) ==================
+@st.cache_data(ttl=86400)  # se refresca una vez al día
+def obtener_tickers_sp500():
+    """Obtiene la lista actualizada del SP500 desde Wikipedia."""
+    try:
+        tabla = pd.read_html(
+            "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
+            header=0
+        )[0]
+        tickers = tabla["Symbol"].str.replace(".", "-", regex=False).tolist()
+        return tickers
+    except Exception as e:
+        st.warning(f"No se pudo obtener la lista actualizada del SP500: {e}. Usando lista de respaldo.")
+        # Lista de respaldo con los tickers más estables (top 100 por capitalización)
+        return [
+            "AAPL","MSFT","AMZN","NVDA","GOOGL","GOOG","META","BRK-B","LLY","AVGO",
+            "JPM","TSLA","UNH","V","XOM","MA","JNJ","PG","HD","COST","MRK","ABBV",
+            "CVX","CRM","BAC","WMT","NFLX","AMD","KO","PEP","TMO","ACN","CSCO","MCD",
+            "ABT","ADBE","ORCL","LIN","DHR","CAT","TXN","WFC","PM","AMGN","MS","NEE",
+            "RTX","IBM","GE","SPGI","HON","UNP","ISRG","INTU","BKNG","AMAT","GS","LOW",
+            "CMCSA","NOW","ETN","VRTX","PLD","REGN","UPS","BLK","SYK","AXP","DE","GILD",
+            "ADI","MDLZ","ADP","LRCX","TJX","TMUS","PANW","CI","SBUX","MO","ELV","BSX",
+            "MMC","SO","KLAC","INTC","PGR","DUK","ZTS","EQIX","CME","APH","COP","AON",
+            "ICE","SHW","SNPS","MCO","USB","GD","ITW","NOC","WM","FI","HCA","CDNS"
+        ]
+
+sp500_tickers = obtener_tickers_sp500()
+st.sidebar.caption(f"📋 {len(sp500_tickers)} tickers cargados")
 
 # ================== FUNCIONES ==================
 def normalize(value, min_val, max_val):
